@@ -3,7 +3,7 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Looks for the latest Ubuntu 18.04 AMI
+# Look for the latest Ubuntu 18.04 AMI
 data "aws_ami" "latest_ubuntu_ami" {
   owners = ["099720109477"]
 
@@ -19,4 +19,10 @@ data "aws_ami" "latest_ubuntu_ami" {
 
   # Return only the most recent image
   most_recent = true
+}
+
+# Web server instance
+resource "aws_instance" "web_server" {
+  ami = "${data.aws_ami.latest_ubuntu_ami.id}"
+  instance_type = "t2.micro"
 }

@@ -96,3 +96,26 @@ ami-07025b83b4379007e
 
 Accordingly, the most recent Ubuntu 18.04 AMI is `ami-07025b83b4379007e`
 
+To search for the AMI in Terraform file, used a Data Source with the below filters:
+
+```
+data "aws_ami" "latest_ubuntu_ami" {
+  owners = ["099720109477"]
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu*18.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+
+  # Return only the most recent image
+  most_recent = true
+}
+```
+
+####The instance must have a public IP address (OK if dynamic; find out how to ask Terraform about the current value of a dynamic IP address) and a security group that allows inbound connections only to port 80 add 22.
+
