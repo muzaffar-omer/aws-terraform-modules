@@ -17,7 +17,7 @@ data "aws_ami" "latest_ubuntu_ami" {
     values = ["available"]
   }
 
-  # Return only the most recent image
+  # Return only the most recent image (returns a single entry)
   most_recent = true
 }
 
@@ -26,31 +26,46 @@ resource "aws_instance" "web_server" {
   ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
   instance_type = "t2.micro"
 
-  vpc_security_group_ids = ["${aws_security_group.sg_web_server.id}"]
+  vpc_security_group_ids = ["${aws_security_group.ws_sg.id}"]
 }
 
 # Contains the Public IP of the Web Server
-output "public_ip" {
-  description = "The public ip of the web server"
+output "ws_public_ip" {
+  description = "Public IP of the web server"
   value       = "${aws_instance.web_server.public_ip}"
 }
 
-resource "aws_security_group" "sg_web_server" {
+variable "ws_http_port" {
+  description = "Default Web Server HTTP port"
+  default     = "80"
+}
+
+variable "ws_ssh_port" {
+  description = "Default Web Server SSH port"
+  default     = "22"
+}
+
+variable "ws_cidr" {
+  description = "CIDR to receive traffic from all hosts"
+  default     = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group" "ws_sg" {
   description = "Web server security group"
 
   # Allow incoming traffic in port 80
   ingress {
-    from_port   = "80"
-    to_port     = "80"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = "${var.ws_http_port}"
+    to_port     = "${var.ws_http_port}"
+    cidr_blocks = "${var.ws_cidr}"
     protocol    = "tcp"
   }
 
   # Allow incoming traffic in port 22
   ingress {
-    from_port   = "22"
-    to_port     = "22"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = "${var.ws_ssh_port}"
+    to_port     = "${var.ws_ssh_port}"
+    cidr_blocks = "${var.ws_cidr}"
     protocol    = "tcp"
   }
 }
