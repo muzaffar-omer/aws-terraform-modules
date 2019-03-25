@@ -117,5 +117,66 @@ data "aws_ami" "latest_ubuntu_ami" {
 }
 ```
 
+Created the instance using `aws_instance`, and used the AMI ID retrieved in the `latest_ubuntu_ami` data source 
+
+```
+resource "aws_instance" "web_server" {
+  ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
+  instance_type = "t2.micro"
+}
+```
+
 ####The instance must have a public IP address (OK if dynamic; find out how to ask Terraform about the current value of a dynamic IP address) and a security group that allows inbound connections only to port 80 add 22.
+
+To extract the public ip of the created instance, defined the below variable
+
+```
+output "ws_public_ip" {
+  description = "Public IP of the web server"
+  value       = "${aws_instance.web_server.public_ip}"
+}
+```
+
+To allow inbound traffic in ports 80 and 22, defined the below security group
+
+```
+variable "ws_http_port" {
+  description = "Default Web Server HTTP port"
+  default     = "80"
+}
+
+variable "ws_ssh_port" {
+  description = "Default Web Server SSH port"
+  default     = "22"
+}
+
+variable "ws_cidr" {
+  description = "CIDR to receive traffic from all hosts"
+  default     = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group" "ws_sg" {
+  description = "Web server security group"
+
+  # Allow incoming traffic in port 80
+  ingress {
+    from_port   = "${var.ws_http_port}"
+    to_port     = "${var.ws_http_port}"
+    cidr_blocks = "${var.ws_cidr}"
+    protocol    = "tcp"
+  }
+
+  # Allow incoming traffic in port 22
+  ingress {
+    from_port   = "${var.ws_ssh_port}"
+    to_port     = "${var.ws_ssh_port}"
+    cidr_blocks = "${var.ws_cidr}"
+    protocol    = "tcp"
+  }
+}
+```
+
+At the beginning the ports 80, 22 were defined as static values directly inside the security group definition, but in order to make them configurable, I moved them into separate variablas. The same is done to the CIDR to enable configurable IP ranges.
+
+####Using the ​provisioner​ you are most familiar with, install and configure nginx so that it will serve a custom static web page (that can be specified in the Terraform configuration file or as a Terraform input variable).
 
