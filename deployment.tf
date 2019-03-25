@@ -26,3 +26,8 @@ resource "aws_instance" "web_server" {
   ami = "${data.aws_ami.latest_ubuntu_ami.id}"
   instance_type = "t2.micro"
 }
+
+# Contains the Public IP of the Web Server
+output "public_ip" {
+  value = "${aws_instance.web_server.public_ip}"
+}
