@@ -244,3 +244,12 @@ provisioner "file" {
   }
 ```
 
+To verify that the web page is deployed properly and accessible from outside, I used a `local-exec` provisioner to issue the `wget` command as below
+
+```
+provisioner "local-exec" {
+    command = "wget -O/dev/null -q http://${aws_instance.web_server.public_ip}/${var.web_page} && echo 'Web page is deployed properly !'"
+  }
+```
+
+`-O/dev/null` option is used in the `wget` command to avoid creating a new file in the working directory.

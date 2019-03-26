@@ -66,6 +66,11 @@ resource "aws_instance" "web_server" {
       "sudo mv /var/tmp/${var.web_page} /var/www/html/${var.web_page}",
     ]
   }
+
+  # Test that the static content is deployed properly
+  provisioner "local-exec" {
+    command = "wget -O/dev/null -q http://${aws_instance.web_server.public_ip}/${var.web_page} && echo 'Web page is deployed properly !'"
+  }
 }
 
 # Contains the Public IP of the Web Server
