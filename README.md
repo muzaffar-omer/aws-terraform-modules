@@ -180,3 +180,30 @@ At the beginning the ports 80, 22 were defined as static values directly inside 
 
 ####Using the ​provisioner​ you are most familiar with, install and configure nginx so that it will serve a custom static web page (that can be specified in the Terraform configuration file or as a Terraform input variable).
 
+In order to use a provisioner, I need to setup an SSH connection with the instance, and provide a key for connection, there are two approaches:
+* Either to generate a key pair in AWS and use the `.pem` file to connect the instance
+* Or, issue a key pair locally, and create a key in AWS using the public key of the local machine, and use the private key of the local machine to connect to the created instance
+
+For this exercise, I will issue a key pair in AWS and use the `.pem` file to connect to the created instance
+
+Below are the steps used to access the instances using the generated key-pair:
+* Generated the key-pair in AWS console `Key Pairs` section with the name `WSKeyPair`
+* Saved the generated private key `.pem` file under the `keys/` directory
+* Configured the instance to use the AWS key pair using the `key_name` attribute in the `aws_instance` resource as below:
+  
+    ```
+    resource "aws_instance" "web_server" {
+        ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
+        instance_type = "t2.micro"
+
+        vpc_security_group_ids = ["${aws_security_group.ws_sg.id}"]
+
+        key_name = "WSKeyPair"
+
+        connection {
+            type = "ssh"
+            user = "ubuntu"
+            private_key = "${file("keys/WSKeyPair.pem")}"
+        }
+    }    
+    ```

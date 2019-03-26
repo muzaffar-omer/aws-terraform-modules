@@ -27,6 +27,14 @@ resource "aws_instance" "web_server" {
   instance_type = "t2.micro"
 
   vpc_security_group_ids = ["${aws_security_group.ws_sg.id}"]
+
+  key_name = "WSKeyPair"
+
+  connection {
+      type = "ssh"
+      user = "ubuntu"
+      private_key = "${file("keys/WSKeyPair.pem")}"
+  }
 }
 
 # Contains the Public IP of the Web Server
