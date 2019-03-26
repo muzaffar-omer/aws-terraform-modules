@@ -25,7 +25,7 @@ Executed the below steps to initialize the repository:
 
 Code generated in exercises 0, 1, 2 is not included in the repository
 
-# Part3 : A simple web server
+# Exercise 3 : A simple web server
 
 ####Using only Terraform, deploy the latest available Ubuntu 18.04 server AMI in the region of your choice (using the free t2.micro instance type). Document how you found the AMI.** 
 
@@ -207,3 +207,18 @@ Below are the steps used to access the instances using the generated key-pair:
         }
     }    
     ```
+
+In order to install nginx in the created instances, I need to use the `remote-exec` provisioner, there are three options to use for the `remote-exec` provisioner:
+* Use `inline` and list all the commands needed to install nginx, but in cases of escape character, it will be a mess, and commands will be unclear
+* Use `script` and upload the script to the created instance first using the `file` provisioner, then execute the uploaded script
+* Use `scripts` which will be the same as using `script` in this case
+
+Personally, I prefer writing a separate script for the installation of nginx, and upload that script to the created instance, then execute the uploaded script in the created instance
+
+Looking at the nginx installation guide https://docs.nginx.com/nginx/admin-guide/installing-nginx/installing-nginx-open-source/#prebuilt_ubuntu, it could be installed using the below commands:
+
+```
+sudo apt-get update -y
+sudo apt-get install -y nginx
+```
+

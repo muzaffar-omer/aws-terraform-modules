@@ -31,9 +31,19 @@ resource "aws_instance" "web_server" {
   key_name = "WSKeyPair"
 
   connection {
-      type = "ssh"
-      user = "ubuntu"
-      private_key = "${file("keys/WSKeyPair.pem")}"
+    type        = "ssh"
+    user        = "ubuntu"
+    private_key = "${file("keys/WSKeyPair.pem")}"
+  }
+
+# Install nginx using the default ubuntu repository, but a better approach
+# could be to add nginx repository to the apt sources list, and install the latest
+# nginx version. But this requires opening port 443 (HTTPS) in the instance
+  provisioner "remote-exec" {
+    inline = [
+      "sudo apt-get update -y",
+      "sudo apt-get install -y nginx"
+    ]
   }
 }
 
@@ -73,6 +83,14 @@ resource "aws_security_group" "ws_sg" {
   ingress {
     from_port   = "${var.ws_ssh_port}"
     to_port     = "${var.ws_ssh_port}"
+    cidr_blocks = "${var.ws_cidr}"
+    protocol    = "tcp"
+  }
+
+  # Allow outgoing traffic in port 80
+  egress {
+    from_port   = "${var.ws_http_port}"
+    to_port     = "${var.ws_http_port}"
     cidr_blocks = "${var.ws_cidr}"
     protocol    = "tcp"
   }
