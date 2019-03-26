@@ -21,6 +21,11 @@ data "aws_ami" "latest_ubuntu_ami" {
   most_recent = true
 }
 
+variable "web_page" {
+  description = "The web page with the static content to be served by the web server"
+  default     = "index.html"
+}
+
 # Web server instance
 resource "aws_instance" "web_server" {
   ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
@@ -36,13 +41,29 @@ resource "aws_instance" "web_server" {
     private_key = "${file("keys/WSKeyPair.pem")}"
   }
 
-# Install nginx using the default ubuntu repository, but a better approach
-# could be to add nginx repository to the apt sources list, and install the latest
-# nginx version. But this requires opening port 443 (HTTPS) in the instance
+  # Install nginx using the default ubuntu repository, but a better approach
+  # could be to add nginx repository to the apt sources list, and install the latest
+  # nginx version. But this requires opening port 443 (HTTPS) in the instance
   provisioner "remote-exec" {
     inline = [
       "sudo apt-get update -y",
-      "sudo apt-get install -y nginx"
+      "sudo apt-get install -y nginx",
+    ]
+  }
+
+  # Transfer the web page from the local machine to the remote instance in
+  # the directory /var/tmp/ to be moved late to nginx default html directory
+  # /var/www/html
+  provisioner "file" {
+    source      = "${var.web_page}"
+    destination = "/var/tmp/${var.web_page}"
+  }
+
+  # Move the web page file from /var/tmp/ directory into /var/www/html 
+  # directory. As /var/www/html directory requires root permission
+  provisioner "remote-exec" {
+    inline = [
+      "sudo mv /var/tmp/${var.web_page} /var/www/html/${var.web_page}",
     ]
   }
 }

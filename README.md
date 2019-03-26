@@ -213,12 +213,34 @@ In order to install nginx in the created instances, I need to use the `remote-ex
 * Use `script` and upload the script to the created instance first using the `file` provisioner, then execute the uploaded script
 * Use `scripts` which will be the same as using `script` in this case
 
-Personally, I prefer writing a separate script for the installation of nginx, and upload that script to the created instance, then execute the uploaded script in the created instance
-
 Looking at the nginx installation guide https://docs.nginx.com/nginx/admin-guide/installing-nginx/installing-nginx-open-source/#prebuilt_ubuntu, it could be installed using the below commands:
 
 ```
 sudo apt-get update -y
 sudo apt-get install -y nginx
+```
+
+In order to serve static content, I need to transfer the content to the directory `/var/www/html` in the remote instance. And to make the server page configurable, I need to define the page as a variable using the below:
+
+```
+variable "web_page" {
+  description = "The web page with the static content to be served by the web server"
+  default     = "index.html"
+}
+```
+
+And updated the `aws_instance` to transfer the web page to the remote instance first to the direcotry `/var/tmp/` then moving the file to the `/var/www/html/` directory. This step is divided into steps because `ubuntu` user is not allowed to transfer the file directly to the `/var/www/html` directory.
+
+```
+provisioner "file" {
+    source      = "${var.web_page}"
+    destination = "/var/tmp/${var.web_page}"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo mv /var/tmp/${var.web_page} /var/www/html/${var.web_page}",
+    ]
+  }
 ```
 
