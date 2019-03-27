@@ -3,6 +3,8 @@ provider "aws" {
   region = "us-east-1"
 }
 
+data "aws_region" "current" {}
+
 # Use a separate VPC for the exercise
 resource "aws_vpc" "ex_vpc" {
   cidr_block           = "10.0.0.0/16"
@@ -60,7 +62,7 @@ resource "aws_route_table" "ex_public_subnet_rt" {
 
 resource "aws_route_table_association" "ex_public_subnet_rt_assc" {
   route_table_id = "${aws_route_table.ex_public_subnet_rt.id}"
-  subnet_id = "${aws_subnet.ex_public_sn.id}"
+  subnet_id      = "${aws_subnet.ex_public_sn.id}"
 }
 
 # Look for the latest Ubuntu 18.04 AMI
@@ -86,6 +88,37 @@ variable "web_page" {
   default     = "index.html"
 }
 
+resource "aws_s3_bucket" "web_page_s3_bucket" {
+  bucket = "${var.web_page_bucket_name}"
+  region = "${data.aws_region.current.name}"
+
+  tags {
+    "Name" = "Static Web Page Bucket"
+  }
+}
+
+resource "aws_s3_bucket_object" "web_page_s3_object" {
+  bucket = "${aws_s3_bucket.web_page_s3_bucket.id}"
+  source = "${var.web_page}"
+  key    = "${var.web_page}"
+
+  tags {
+    "Name" = "The static page to be served by nginx"
+  }
+}
+
+variable "web_page_bucket_name" {
+  default = "pix4d.ex.static-web-page-bucket"
+}
+
+
+data "aws_s3_bucket_object" "web_page_content" {
+  bucket = "${var.web_page_bucket_name}"
+  key    = "${var.web_page}"
+
+  depends_on = ["aws_s3_bucket_object.web_page_s3_object"]
+}
+
 # Web server instance
 resource "aws_instance" "web_server" {
   ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
@@ -94,44 +127,25 @@ resource "aws_instance" "web_server" {
   vpc_security_group_ids = ["${aws_security_group.ws_sg.id}"]
   subnet_id              = "${aws_subnet.ex_public_sn.id}"
 
-  key_name = "WSKeyPair"
+  key_name = "${aws_key_pair.public_key_pair.key_name}"
 
-  connection {
-    type        = "ssh"
-    user        = "ubuntu"
-    private_key = "${file("keys/WSKeyPair.pem")}"
-  }
+  # Install nginx
+  user_data = <<-EOF
+    sudo apt-get update -y
+    sudo apt-get install -y nginx
+  EOF
 
-  # Install nginx using the default ubuntu repository, but a better approach
-  # could be to add nginx repository to the apt sources list, and install the latest
-  # nginx version. But this requires opening port 443 (HTTPS) in the instance
-  provisioner "remote-exec" {
-    inline = [
-      "sudo apt-get update -y",
-      "sudo apt-get install -y nginx",
-    ]
-  }
-
-  # Transfer the web page from the local machine to the remote instance in
-  # the directory /var/tmp/ to be moved late to nginx default html directory
-  # /var/www/html
   provisioner "file" {
-    source      = "${var.web_page}"
-    destination = "/var/tmp/${var.web_page}"
-  }
-
-  # Move the web page file from /var/tmp/ directory into /var/www/html 
-  # directory. As /var/www/html directory requires root permission
-  provisioner "remote-exec" {
-    inline = [
-      "sudo mv /var/tmp/${var.web_page} /var/www/html/${var.web_page}",
-    ]
+    content     = "${data.aws_s3_bucket_object.web_page_content.body}"
+    destination = "/var/www/html/${var.web_page}"
   }
 
   # Test that the static content is deployed properly
   provisioner "local-exec" {
     command = "wget -O/dev/null -q http://${aws_instance.web_server.public_ip}/${var.web_page} && echo 'Web page is deployed properly !'"
   }
+  
+  depends_on = ["aws_s3_bucket.web_page_s3_bucket"]
 
   tags {
     "Name" = "Nginx Web Server"
@@ -175,7 +189,7 @@ resource "aws_security_group" "ws_sg" {
   ingress {
     from_port   = "${var.ws_ssh_port}"
     to_port     = "${var.ws_ssh_port}"
-    cidr_blocks = "${var.ws_cidr}"
+    cidr_blocks = ["${aws_subnet.ex_public_sn.cidr_block}"]
     protocol    = "tcp"
   }
 
@@ -192,8 +206,12 @@ resource "aws_security_group" "ws_sg" {
   }
 }
 
-
 ######################## Exercise 4 ###################################
+
+resource "aws_key_pair" "public_key_pair" {
+  public_key = "${file("keys/${var.ssh_key}.pub")}"
+  key_name   = "Ex Instances Public Key"
+}
 
 output "bastion_public_ip" {
   description = "Bastion server public ip"
@@ -225,6 +243,10 @@ resource "aws_security_group" "bastion_sg" {
   }
 }
 
+variable "ssh_key" {
+  description = "Name of the public key to be generated in local host and deployed to the instances"
+  default     = "ex_key"
+}
 
 resource "aws_instance" "bastion_server" {
   ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
@@ -233,12 +255,25 @@ resource "aws_instance" "bastion_server" {
   vpc_security_group_ids = ["${aws_security_group.bastion_sg.id}"]
   subnet_id              = "${aws_subnet.ex_public_sn.id}"
 
-  key_name = "WSKeyPair"
+  key_name = "${aws_key_pair.public_key_pair.key_name}"
 
   connection {
     type        = "ssh"
     user        = "ubuntu"
-    private_key = "${file("keys/WSKeyPair.pem")}"
+    private_key = "${file("keys/${var.ssh_key}")}"
+  }
+
+  # Transfer private key to Bastion
+  provisioner "file" {
+    source      = "keys/${var.ssh_key}"
+    destination = "~/${var.ssh_key}"
+  }
+
+  # Try connecting to the backend server from bastion server
+  provisioner "remote-exec" {
+    inline = [
+      "chmod 400 ~/${var.ssh_key}",
+    ]
   }
 
   tags {
@@ -246,9 +281,9 @@ resource "aws_instance" "bastion_server" {
   }
 }
 
-output "backend_public_ip" {
+output "backend_private_ip" {
   description = "Backend server public ip"
-  value       = "${aws_instance.backend_server.public_ip}"
+  value       = "${aws_instance.backend_server.private_ip}"
 }
 
 resource "aws_security_group" "backend_server_sg" {
@@ -275,16 +310,9 @@ resource "aws_instance" "backend_server" {
   vpc_security_group_ids = ["${aws_security_group.backend_server_sg.id}"]
   subnet_id              = "${aws_subnet.ex_private_sn.id}"
 
-  key_name = "WSKeyPair"
-
-  connection {
-    type        = "ssh"
-    user        = "ubuntu"
-    private_key = "${file("keys/WSKeyPair.pem")}"
-  }
+  key_name = "${aws_key_pair.public_key_pair.key_name}"
 
   tags {
     "Name" = "Backend Server"
   }
 }
-
