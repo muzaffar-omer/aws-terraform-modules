@@ -134,6 +134,10 @@ resource "aws_instance" "web_server" {
   provisioner "local-exec" {
     command = "wget -O/dev/null -q http://${aws_instance.web_server.public_ip}/${var.web_page} && echo 'Web page is deployed properly !'"
   }
+
+  tags {
+    "Name" = "Nginx Web Server"
+  }
 }
 
 # Contains the Public IP of the Web Server
