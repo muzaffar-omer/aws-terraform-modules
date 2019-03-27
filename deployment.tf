@@ -193,3 +193,82 @@ resource "aws_security_group" "ws_sg" {
     "Name" = "Webserver SG"
   }
 }
+
+
+######################## Exercise 4 ###################################
+
+resource "aws_security_group" "bastion_sg" {
+  description = "Bastion server security group"
+  vpc_id      = "${aws_vpc.ex_vpc.id}"
+
+  # Allow incoming traffic in port 22
+  ingress {
+    from_port   = "${var.ws_ssh_port}"
+    to_port     = "${var.ws_ssh_port}"
+    cidr_blocks = "${var.ws_cidr}"
+    protocol    = "tcp"
+  }
+
+  tags {
+    "Name" = "BastionServer SG"
+  }
+}
+
+
+resource "aws_instance" "bastion_server" {
+  ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
+  instance_type = "t2.micro"
+
+  vpc_security_group_ids = ["${aws_security_group.bastion_sg.id}"]
+  subnet_id              = "${aws_subnet.ex_public_sn.id}"
+
+  key_name = "WSKeyPair"
+
+  connection {
+    type        = "ssh"
+    user        = "ubuntu"
+    private_key = "${file("keys/WSKeyPair.pem")}"
+  }
+
+  tags {
+    "Name" = "Bastion Server"
+  }
+}
+
+resource "aws_security_group" "backend_server_sg" {
+  description = "Backend server security group"
+  vpc_id      = "${aws_vpc.ex_vpc.id}"
+
+  # Allow incoming traffic in port 22
+  ingress {
+    from_port   = "${var.ws_ssh_port}"
+    to_port     = "${var.ws_ssh_port}"
+    cidr_blocks = ["${aws_subnet.ex_public_sn.cidr_block}"]
+    protocol    = "tcp"
+  }
+
+  tags {
+    "Name" = "BastionServer SG"
+  }
+}
+
+resource "aws_instance" "backend_server" {
+  ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
+  instance_type = "t2.micro"
+
+  vpc_security_group_ids = ["${aws_security_group.backend_server_sg.id}"]
+  subnet_id              = "${aws_subnet.ex_private_sn.id}"
+
+  key_name = "WSKeyPair"
+
+  connection {
+    type        = "ssh"
+    user        = "ubuntu"
+    private_key = "${file("keys/WSKeyPair.pem")}"
+  }
+
+  tags {
+    "Name" = "Backend Server"
+  }
+}
+
