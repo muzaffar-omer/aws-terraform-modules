@@ -58,8 +58,6 @@ resource "aws_route_table" "ex_public_subnet_rt" {
   }
 }
 
-
-# Link the public routing table to the public subnet
 resource "aws_route_table_association" "ex_public_subnet_rt_assc" {
   route_table_id = "${aws_route_table.ex_public_subnet_rt.id}"
   subnet_id = "${aws_subnet.ex_public_sn.id}"
@@ -197,15 +195,28 @@ resource "aws_security_group" "ws_sg" {
 
 ######################## Exercise 4 ###################################
 
+output "bastion_public_ip" {
+  description = "Bastion server public ip"
+  value       = "${aws_instance.bastion_server.public_ip}"
+}
+
 resource "aws_security_group" "bastion_sg" {
   description = "Bastion server security group"
   vpc_id      = "${aws_vpc.ex_vpc.id}"
 
-  # Allow incoming traffic in port 22
+  # Allow incoming SSH traffic from everywhere
   ingress {
     from_port   = "${var.ws_ssh_port}"
     to_port     = "${var.ws_ssh_port}"
     cidr_blocks = "${var.ws_cidr}"
+    protocol    = "tcp"
+  }
+
+  # Allow outgoing SSH traffic toward any instances in the VPC
+  egress {
+    from_port   = "${var.ws_ssh_port}"
+    to_port     = "${var.ws_ssh_port}"
+    cidr_blocks = ["${aws_vpc.ex_vpc.cidr_block}"]
     protocol    = "tcp"
   }
 
@@ -235,6 +246,11 @@ resource "aws_instance" "bastion_server" {
   }
 }
 
+output "backend_public_ip" {
+  description = "Backend server public ip"
+  value       = "${aws_instance.backend_server.public_ip}"
+}
+
 resource "aws_security_group" "backend_server_sg" {
   description = "Backend server security group"
   vpc_id      = "${aws_vpc.ex_vpc.id}"
@@ -248,7 +264,7 @@ resource "aws_security_group" "backend_server_sg" {
   }
 
   tags {
-    "Name" = "BastionServer SG"
+    "Name" = "BackendServer SG"
   }
 }
 
