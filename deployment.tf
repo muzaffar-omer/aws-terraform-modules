@@ -3,7 +3,82 @@ provider "aws" {
   region = "us-east-1"
 }
 
-data "aws_region" "current" {}
+output "backend_private_ip" {
+  description = "Backend server public ip"
+  value       = "${aws_instance.backend_server.private_ip}"
+}
+
+output "web_server_public_ip" {
+  description = "Web server public ip"
+  value       = "${aws_instance.web_server.public_ip}"
+}
+
+output "web_server_private_ip" {
+  description = "Web server private ip"
+  value       = "${aws_instance.web_server.private_ip}"
+}
+
+output "bastion_public_ip" {
+  description = "Bastion server public ip"
+  value       = "${aws_instance.bastion_server.public_ip}"
+}
+
+output "bastion_private_ip" {
+  description = "Bastion server private ip"
+  value       = "${aws_instance.bastion_server.private_ip}"
+}
+
+# Look for the latest Ubuntu 18.04 AMI
+data "aws_ami" "latest_ubuntu_ami" {
+  owners = ["099720109477"]
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu*18.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+
+  # Return only the most recent image (returns a single entry)
+  most_recent = true
+}
+
+data "template_file" "web_page_content" {
+  template = "${file("install_nginx_and_deploy.sh")}"
+
+  vars = {
+    web_page_name    = "${var.web_page}"
+    web_page_content = "${file(var.web_page)}"
+  }
+}
+
+variable "ssh_key" {
+  description = "Name of the public key to be generated in local host and deployed to the instances"
+  default     = "ex_key"
+}
+
+variable "ws_http_port" {
+  description = "Default Web Server HTTP port"
+  default     = "80"
+}
+
+variable "ws_ssh_port" {
+  description = "Default Web Server SSH port"
+  default     = "22"
+}
+
+variable "ws_cidr" {
+  description = "CIDR to receive traffic from all hosts"
+  default     = ["0.0.0.0/0"]
+}
+
+variable "web_page" {
+  description = "The web page with the static content to be served by the web server"
+  default     = "index.html"
+}
 
 # Use a separate VPC for the exercise
 resource "aws_vpc" "ex_vpc" {
@@ -65,60 +140,6 @@ resource "aws_route_table_association" "ex_public_subnet_rt_assc" {
   subnet_id      = "${aws_subnet.ex_public_sn.id}"
 }
 
-# Look for the latest Ubuntu 18.04 AMI
-data "aws_ami" "latest_ubuntu_ami" {
-  owners = ["099720109477"]
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu*18.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "state"
-    values = ["available"]
-  }
-
-  # Return only the most recent image (returns a single entry)
-  most_recent = true
-}
-
-variable "web_page" {
-  description = "The web page with the static content to be served by the web server"
-  default     = "index.html"
-}
-
-resource "aws_s3_bucket" "web_page_s3_bucket" {
-  bucket = "${var.web_page_bucket_name}"
-  region = "${data.aws_region.current.name}"
-
-  tags {
-    "Name" = "Static Web Page Bucket"
-  }
-}
-
-resource "aws_s3_bucket_object" "web_page_s3_object" {
-  bucket = "${aws_s3_bucket.web_page_s3_bucket.id}"
-  source = "${var.web_page}"
-  key    = "${var.web_page}"
-
-  tags {
-    "Name" = "The static page to be served by nginx"
-  }
-}
-
-variable "web_page_bucket_name" {
-  default = "pix4d.ex.static-web-page-bucket"
-}
-
-
-data "aws_s3_bucket_object" "web_page_content" {
-  bucket = "${var.web_page_bucket_name}"
-  key    = "${var.web_page}"
-
-  depends_on = ["aws_s3_bucket_object.web_page_s3_object"]
-}
-
 # Web server instance
 resource "aws_instance" "web_server" {
   ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
@@ -130,47 +151,16 @@ resource "aws_instance" "web_server" {
   key_name = "${aws_key_pair.public_key_pair.key_name}"
 
   # Install nginx
-  user_data = <<-EOF
-    sudo apt-get update -y
-    sudo apt-get install -y nginx
-  EOF
-
-  provisioner "file" {
-    content     = "${data.aws_s3_bucket_object.web_page_content.body}"
-    destination = "/var/www/html/${var.web_page}"
-  }
+  user_data = "${data.template_file.web_page_content.rendered}"
 
   # Test that the static content is deployed properly
-  provisioner "local-exec" {
-    command = "wget -O/dev/null -q http://${aws_instance.web_server.public_ip}/${var.web_page} && echo 'Web page is deployed properly !'"
-  }
-  
-  depends_on = ["aws_s3_bucket.web_page_s3_bucket"]
+  # provisioner "local-exec" {
+  #   command = "wget -O/dev/null -q http://${aws_instance.web_server.public_ip}/${var.web_page} && echo 'Web page is deployed properly !'"
+  # }
 
   tags {
     "Name" = "Nginx Web Server"
   }
-}
-
-# Contains the Public IP of the Web Server
-output "ws_public_ip" {
-  description = "Public IP of the web server"
-  value       = "${aws_instance.web_server.public_ip}"
-}
-
-variable "ws_http_port" {
-  description = "Default Web Server HTTP port"
-  default     = "80"
-}
-
-variable "ws_ssh_port" {
-  description = "Default Web Server SSH port"
-  default     = "22"
-}
-
-variable "ws_cidr" {
-  description = "CIDR to receive traffic from all hosts"
-  default     = ["0.0.0.0/0"]
 }
 
 resource "aws_security_group" "ws_sg" {
@@ -207,15 +197,9 @@ resource "aws_security_group" "ws_sg" {
 }
 
 ######################## Exercise 4 ###################################
-
 resource "aws_key_pair" "public_key_pair" {
   public_key = "${file("keys/${var.ssh_key}.pub")}"
   key_name   = "Ex Instances Public Key"
-}
-
-output "bastion_public_ip" {
-  description = "Bastion server public ip"
-  value       = "${aws_instance.bastion_server.public_ip}"
 }
 
 resource "aws_security_group" "bastion_sg" {
@@ -241,11 +225,6 @@ resource "aws_security_group" "bastion_sg" {
   tags {
     "Name" = "BastionServer SG"
   }
-}
-
-variable "ssh_key" {
-  description = "Name of the public key to be generated in local host and deployed to the instances"
-  default     = "ex_key"
 }
 
 resource "aws_instance" "bastion_server" {
@@ -279,11 +258,6 @@ resource "aws_instance" "bastion_server" {
   tags {
     "Name" = "Bastion Server"
   }
-}
-
-output "backend_private_ip" {
-  description = "Backend server public ip"
-  value       = "${aws_instance.backend_server.private_ip}"
 }
 
 resource "aws_security_group" "backend_server_sg" {
