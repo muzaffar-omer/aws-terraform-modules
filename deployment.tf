@@ -52,6 +52,7 @@ data "template_file" "web_page_content" {
   vars = {
     web_page_name    = "${var.web_page}"
     web_page_content = "${file(var.web_page)}"
+    domain_name = "www.habitat-sd.com"
   }
 }
 
@@ -145,7 +146,7 @@ resource "aws_instance" "web_server" {
   ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
   instance_type = "t2.micro"
 
-  vpc_security_group_ids = ["${aws_security_group.ws_sg.id}"]
+  vpc_security_group_ids = ["${aws_security_group.web_server_sg.id}"]
   subnet_id              = "${aws_subnet.ex_public_sn.id}"
 
   key_name = "${aws_key_pair.public_key_pair.key_name}"
@@ -163,7 +164,7 @@ resource "aws_instance" "web_server" {
   }
 }
 
-resource "aws_security_group" "ws_sg" {
+resource "aws_security_group" "web_server_sg" {
   description = "Web server security group"
   vpc_id      = "${aws_vpc.ex_vpc.id}"
 
@@ -187,6 +188,14 @@ resource "aws_security_group" "ws_sg" {
   egress {
     from_port   = "${var.ws_http_port}"
     to_port     = "${var.ws_http_port}"
+    cidr_blocks = "${var.ws_cidr}"
+    protocol    = "tcp"
+  }
+
+  # Allow outgoing traffic in port 80
+  egress {
+    from_port   = "443"
+    to_port     = "443"
     cidr_blocks = "${var.ws_cidr}"
     protocol    = "tcp"
   }
