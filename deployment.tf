@@ -8,16 +8,6 @@ output "backend_private_ip" {
   value       = "${aws_instance.backend_server.private_ip}"
 }
 
-output "web_server_public_ip" {
-  description = "Web server public ip"
-  value       = "${aws_instance.web_server.public_ip}"
-}
-
-output "web_server_private_ip" {
-  description = "Web server private ip"
-  value       = "${aws_instance.web_server.private_ip}"
-}
-
 output "bastion_public_ip" {
   description = "Bastion server public ip"
   value       = "${aws_instance.bastion_server.public_ip}"
@@ -44,28 +34,6 @@ data "aws_ami" "latest_ubuntu_ami" {
 
   # Return only the most recent image (returns a single entry)
   most_recent = true
-}
-
-# Template to parsed into a shell script that will be 
-# executed during web server instance creation, it will be used as AWS user data
-data "template_file" "web_page_content" {
-  template = "${file("install_nginx_and_certs.tpl")}"
-
-  vars = {
-    web_page_file_name    = "${var.web_page_file_name}"
-    web_page_content = "${file(var.web_page_file_name)}"
-    domain_name = "${var.domain_name}"
-    email = "${var.email}"
-  }
-}
-
-data "template_file" "web_page_deployment_validation" {
-  template = "${file("validate_web_page_deployment.tpl")}"
-
-  vars = {
-    web_page_name = "${var.web_page_file_name}"
-    domain_name = "${var.domain_name}"
-  }
 }
 
 data "aws_eip" "web_server_eip" {
@@ -177,87 +145,27 @@ resource "aws_route_table_association" "ex_public_subnet_rt_assc" {
   subnet_id      = "${aws_subnet.ex_public_sn.id}"
 }
 
-# Web server instance
-resource "aws_instance" "web_server" {
-  ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
-  instance_type = "t2.micro"
 
-  vpc_security_group_ids = ["${aws_security_group.web_server_sg.id}"]
-  subnet_id              = "${aws_subnet.ex_public_sn.id}"
+module "web_server" {
+  source = "./modules/web-server"
 
+  ami_id = "${data.aws_ami.latest_ubuntu_ami.id}"
+  subnet_id = "${aws_subnet.ex_public_sn.id}"
   key_name = "${aws_key_pair.public_key_pair.key_name}"
-
-  # Install nginx
-  user_data = "${data.template_file.web_page_content.rendered}"
-
-  # provisioner "local-exec" {
-  #   command = "${data.template_file.web_page_deployment_validation.rendered}"
-  # }
-
-  tags {
-    "Name" = "Nginx Web Server"
-  }
+  web_page_content = "<body><h1>Awesome Terraform !</h1></body>"
+  web_page_file_name = "${var.web_page_file_name}"
+  domain_name = "${var.domain_name}"
+  email = "${var.email}"
+  public_subnet_cidr = "${aws_subnet.ex_public_sn.cidr_block}"
+  vpc_id = "${aws_vpc.ex_vpc.id}"
 }
+
+
 
 # Link the web server to the elastic ip used in DNS
 resource "aws_eip_association" "web_server_eip_assc" {
-  instance_id = "${aws_instance.web_server.id}"
+  instance_id = "${module.web_server.instance_id}"
   allocation_id = "${data.aws_eip.web_server_eip.id}"
-}
-
-# Web server security group
-# - Enable incoming HTTP traffic from everywhere
-# - Enable incoming SSH traffic from VPC instances only 
-# - Enable outgoing HTTP, HTTPS traffic to everywhere
-resource "aws_security_group" "web_server_sg" {
-  description = "Web server security group"
-  vpc_id      = "${aws_vpc.ex_vpc.id}"
-
-  # Allow incoming HTTP traffic from everywhere
-  ingress {
-    from_port   = "${var.http_port}"
-    to_port     = "${var.http_port}"
-    cidr_blocks = "${var.all_hosts_cidr}"
-    protocol    = "tcp"
-  }
-
-  # Allow incoming HTTPS traffic from everywhere
-  ingress {
-    from_port   = "${var.https_port}"
-    to_port     = "${var.https_port}"
-    cidr_blocks = "${var.all_hosts_cidr}"
-    protocol    = "tcp"
-  }
-
-  # Allow incoming SSH traffic from VPC instances only
-  ingress {
-    from_port   = "${var.ssh_port}"
-    to_port     = "${var.ssh_port}"
-    cidr_blocks = ["${aws_subnet.ex_public_sn.cidr_block}"]
-    protocol    = "tcp"
-  }
-
-  # Allow outgoing HTTP traffic to everywhere, this enables
-  # installation and update of packages using apt-get
-  egress {
-    from_port   = "${var.http_port}"
-    to_port     = "${var.http_port}"
-    cidr_blocks = "${var.all_hosts_cidr}"
-    protocol    = "tcp"
-  }
-
-  # Allow outgoing HTTPS traffic to everywhere, this enables
-  # installation of signing certificates required during installation of apt-get packages
-  egress {
-    from_port   = "${var.https_port}"
-    to_port     = "${var.https_port}"
-    cidr_blocks = "${var.all_hosts_cidr}"
-    protocol    = "tcp"
-  }
-
-  tags {
-    "Name" = "Webserver SG"
-  }
 }
 
 # Public key deployed in all created instances, to enable accessing the instances
