@@ -67,7 +67,7 @@ data "aws_eip" "web_server_eip" {
 
 variable "ssh_key" {
   description = "Name of the public key file, contents of this file will be used to create a key_pair in AWS"
-  default     = "ex_key.pub"
+  default     = "ex_key"
 }
 
 variable "http_port" {
@@ -255,7 +255,7 @@ resource "aws_security_group" "web_server_sg" {
 # Public key deployed in all created instances, to enable accessing the instances
 # using the private key of the key pair
 resource "aws_key_pair" "public_key_pair" {
-  public_key = "${file("keys/${var.ssh_key}")}"
+  public_key = "${file("keys/${var.ssh_key}.pub")}"
   key_name   = "Ex Instances Public Key"
 }
 
