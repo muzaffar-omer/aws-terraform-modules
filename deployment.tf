@@ -1,4 +1,4 @@
-# Use US East (N. Virginia) region as default
+# Use US East (N. Virginia) region as default region
 provider "aws" {
   region = "us-east-1"
 }
@@ -30,7 +30,7 @@ output "bastion_private_ip" {
 
 # Look for the latest Ubuntu 18.04 AMI
 data "aws_ami" "latest_ubuntu_ami" {
-  owners = ["099720109477"]
+  owners = ["099720109477"] # Canonical (official owner of ubuntu) Owner ID
 
   filter {
     name   = "name"
@@ -46,39 +46,63 @@ data "aws_ami" "latest_ubuntu_ami" {
   most_recent = true
 }
 
+# Template to parsed into a shell script that will be 
+# executed during web server instance creation, it will be used as AWS user data
 data "template_file" "web_page_content" {
-  template = "${file("install_nginx_and_deploy.sh")}"
+  template = "${file("install_nginx_and_certs.tpl")}"
 
   vars = {
-    web_page_name    = "${var.web_page}"
-    web_page_content = "${file(var.web_page)}"
-    domain_name = "www.habitat-sd.com"
+    web_page_file_name    = "${var.web_page_file_name}"
+    web_page_content = "${file(var.web_page_file_name)}"
+    domain_name = "${var.domain_name}"
+    email = "${var.email}"
+  }
+}
+
+data "aws_eip" "web_server_eip" {
+  tags = {
+    "Name" = "WebServerEIP"
   }
 }
 
 variable "ssh_key" {
-  description = "Name of the public key to be generated in local host and deployed to the instances"
-  default     = "ex_key"
+  description = "Name of the public key file, contents of this file will be used to create a key_pair in AWS"
+  default     = "ex_key.pub"
 }
 
-variable "ws_http_port" {
-  description = "Default Web Server HTTP port"
+variable "http_port" {
+  description = "Default HTTP port"
   default     = "80"
 }
 
-variable "ws_ssh_port" {
-  description = "Default Web Server SSH port"
+variable "ssh_port" {
+  description = "Default SSH port"
   default     = "22"
 }
 
-variable "ws_cidr" {
-  description = "CIDR to receive traffic from all hosts"
+variable "https_port" {
+  description = "Default HTTPS port"
+  default = "443"
+}
+
+variable "all_hosts_cidr" {
+  description = "CIDR to allow traffic for all hosts"
   default     = ["0.0.0.0/0"]
 }
 
-variable "web_page" {
-  description = "The web page with the static content to be served by the web server"
+variable "web_page_file_name" {
+  description = "Name of the web page file which will be deployed to the web server instance"
   default     = "index.html"
+}
+
+variable "domain_name" {
+  description = "Domain name used for deployment of the certificates"
+  default = "www.habitat-sd.com"
+}
+
+variable "email" {
+  description = "Email address used during deployment of certificates"
+  default = "muzaffar.omer@gmail.com"
 }
 
 # Use a separate VPC for the exercise
@@ -122,10 +146,11 @@ resource "aws_internet_gateway" "ex_igw" {
   }
 }
 
+# Public subnet routing table to all
 resource "aws_route_table" "ex_public_subnet_rt" {
   vpc_id = "${aws_vpc.ex_vpc.id}"
 
-  # Traffic going to the internet
+  # Forward traffic going to the internet through the internet gateway
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = "${aws_internet_gateway.ex_igw.id}"
@@ -136,6 +161,8 @@ resource "aws_route_table" "ex_public_subnet_rt" {
   }
 }
 
+# Link public subnet with the routing table to forward traffic outgoing
+# to the internet through the internet gateway
 resource "aws_route_table_association" "ex_public_subnet_rt_assc" {
   route_table_id = "${aws_route_table.ex_public_subnet_rt.id}"
   subnet_id      = "${aws_subnet.ex_public_sn.id}"
@@ -164,39 +191,59 @@ resource "aws_instance" "web_server" {
   }
 }
 
+# Link the web server to the elastic ip used in DNS
+resource "aws_eip_association" "web_server_eip_assc" {
+  instance_id = "${aws_instance.web_server.id}"
+  allocation_id = "${data.aws_eip.web_server_eip.id}"
+}
+
+# Web server security group
+# - Enable incoming HTTP traffic from everywhere
+# - Enable incoming SSH traffic from VPC instances only 
+# - Enable outgoing HTTP, HTTPS traffic to everywhere
 resource "aws_security_group" "web_server_sg" {
   description = "Web server security group"
   vpc_id      = "${aws_vpc.ex_vpc.id}"
 
-  # Allow incoming traffic in port 80
+  # Allow incoming HTTP traffic from everywhere
   ingress {
-    from_port   = "${var.ws_http_port}"
-    to_port     = "${var.ws_http_port}"
-    cidr_blocks = "${var.ws_cidr}"
+    from_port   = "${var.http_port}"
+    to_port     = "${var.http_port}"
+    cidr_blocks = "${var.all_hosts_cidr}"
     protocol    = "tcp"
   }
 
-  # Allow incoming traffic in port 22
+  # Allow incoming HTTPS traffic from everywhere
   ingress {
-    from_port   = "${var.ws_ssh_port}"
-    to_port     = "${var.ws_ssh_port}"
+    from_port   = "${var.https_port}"
+    to_port     = "${var.https_port}"
+    cidr_blocks = "${var.all_hosts_cidr}"
+    protocol    = "tcp"
+  }
+
+  # Allow incoming SSH traffic from VPC instances only
+  ingress {
+    from_port   = "${var.ssh_port}"
+    to_port     = "${var.ssh_port}"
     cidr_blocks = ["${aws_subnet.ex_public_sn.cidr_block}"]
     protocol    = "tcp"
   }
 
-  # Allow outgoing traffic in port 80
+  # Allow outgoing HTTP traffic to everywhere, this enables
+  # installation and update of packages using apt-get
   egress {
-    from_port   = "${var.ws_http_port}"
-    to_port     = "${var.ws_http_port}"
-    cidr_blocks = "${var.ws_cidr}"
+    from_port   = "${var.http_port}"
+    to_port     = "${var.http_port}"
+    cidr_blocks = "${var.all_hosts_cidr}"
     protocol    = "tcp"
   }
 
-  # Allow outgoing traffic in port 80
+  # Allow outgoing HTTPS traffic to everywhere, this enables
+  # installation of signing certificates required during installation of apt-get packages
   egress {
-    from_port   = "443"
-    to_port     = "443"
-    cidr_blocks = "${var.ws_cidr}"
+    from_port   = "${var.https_port}"
+    to_port     = "${var.https_port}"
+    cidr_blocks = "${var.all_hosts_cidr}"
     protocol    = "tcp"
   }
 
@@ -205,28 +252,32 @@ resource "aws_security_group" "web_server_sg" {
   }
 }
 
-######################## Exercise 4 ###################################
+# Public key deployed in all created instances, to enable accessing the instances
+# using the private key of the key pair
 resource "aws_key_pair" "public_key_pair" {
-  public_key = "${file("keys/${var.ssh_key}.pub")}"
+  public_key = "${file("keys/${var.ssh_key}")}"
   key_name   = "Ex Instances Public Key"
 }
 
+# Bastion server security group
+# - Enable SSH incoming from anywhere
+# - Enable SSH outgoing toward instances of the VPC only
 resource "aws_security_group" "bastion_sg" {
   description = "Bastion server security group"
   vpc_id      = "${aws_vpc.ex_vpc.id}"
 
   # Allow incoming SSH traffic from everywhere
   ingress {
-    from_port   = "${var.ws_ssh_port}"
-    to_port     = "${var.ws_ssh_port}"
-    cidr_blocks = "${var.ws_cidr}"
+    from_port   = "${var.ssh_port}"
+    to_port     = "${var.ssh_port}"
+    cidr_blocks = "${var.all_hosts_cidr}"
     protocol    = "tcp"
   }
 
   # Allow outgoing SSH traffic toward any instances in the VPC
   egress {
-    from_port   = "${var.ws_ssh_port}"
-    to_port     = "${var.ws_ssh_port}"
+    from_port   = "${var.ssh_port}"
+    to_port     = "${var.ssh_port}"
     cidr_blocks = ["${aws_vpc.ex_vpc.cidr_block}"]
     protocol    = "tcp"
   }
@@ -236,6 +287,7 @@ resource "aws_security_group" "bastion_sg" {
   }
 }
 
+# Bastion server instance
 resource "aws_instance" "bastion_server" {
   ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
   instance_type = "t2.micro"
@@ -269,14 +321,16 @@ resource "aws_instance" "bastion_server" {
   }
 }
 
+# Backend server security group
+# - Enable only SSH traffic incoming from VPC instances only
 resource "aws_security_group" "backend_server_sg" {
   description = "Backend server security group"
   vpc_id      = "${aws_vpc.ex_vpc.id}"
 
-  # Allow incoming traffic in port 22
+  # Allow incoming SSH traffic coming from VPC instances only
   ingress {
-    from_port   = "${var.ws_ssh_port}"
-    to_port     = "${var.ws_ssh_port}"
+    from_port   = "${var.ssh_port}"
+    to_port     = "${var.ssh_port}"
     cidr_blocks = ["${aws_subnet.ex_public_sn.cidr_block}"]
     protocol    = "tcp"
   }
@@ -286,6 +340,7 @@ resource "aws_security_group" "backend_server_sg" {
   }
 }
 
+# Backend server instance
 resource "aws_instance" "backend_server" {
   ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
   instance_type = "t2.micro"
