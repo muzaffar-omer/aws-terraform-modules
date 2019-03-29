@@ -59,6 +59,15 @@ data "template_file" "web_page_content" {
   }
 }
 
+data "template_file" "web_page_deployment_validation" {
+  template = "${file("validate_web_page_deployment.tpl")}"
+
+  vars = {
+    web_page_name = "${var.web_page_file_name}"
+    domain_name = "${var.domain_name}"
+  }
+}
+
 data "aws_eip" "web_server_eip" {
   tags = {
     "Name" = "WebServerEIP"
@@ -181,9 +190,8 @@ resource "aws_instance" "web_server" {
   # Install nginx
   user_data = "${data.template_file.web_page_content.rendered}"
 
-  # Test that the static content is deployed properly
   # provisioner "local-exec" {
-  #   command = "wget -O/dev/null -q http://${aws_instance.web_server.public_ip}/${var.web_page} && echo 'Web page is deployed properly !'"
+  #   command = "${data.template_file.web_page_deployment_validation.rendered}"
   # }
 
   tags {
