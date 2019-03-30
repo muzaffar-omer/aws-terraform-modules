@@ -1,14 +1,3 @@
-# Use US East (N. Virginia) region as default region
-provider "aws" {
-  region = "us-east-1"
-}
-
-output "backend_private_ip" {
-  description = "Backend server public ip"
-  value       = "${aws_instance.backend_server.private_ip}"
-}
-
-
 # Look for the latest Ubuntu 18.04 AMI
 data "aws_ami" "latest_ubuntu_ami" {
   owners = ["099720109477"] # Canonical (official owner of ubuntu) Owner ID
@@ -32,110 +21,6 @@ data "aws_eip" "web_server_eip" {
     "Name" = "WebServerEIP"
   }
 }
-
-variable "ssh_key_file_name" {
-  description = "Name of the public key file, contents of this file will be used to create a key_pair in AWS"
-  default     = "ex_key"
-}
-
-variable "http_port" {
-  description = "Default HTTP port"
-  default     = "80"
-}
-
-variable "ssh_port" {
-  description = "Default SSH port"
-  default     = "22"
-}
-
-variable "https_port" {
-  description = "Default HTTPS port"
-  default = "443"
-}
-
-variable "all_hosts_cidr" {
-  description = "CIDR to allow traffic for all hosts"
-  default     = ["0.0.0.0/0"]
-}
-
-variable "web_page_file_name" {
-  description = "Name of the web page file which will be deployed to the web server instance"
-  default     = "index.html"
-}
-
-variable "domain_name" {
-  description = "Domain name used for deployment of the certificates"
-  default = "www.habitat-sd.com"
-}
-
-variable "email" {
-  description = "Email address used during deployment of certificates"
-  default = "muzaffar.omer@gmail.com"
-}
-
-# Use a separate VPC for the exercise
-resource "aws_vpc" "ex_vpc" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-
-  tags = {
-    "Name" = "Exercise VPC"
-  }
-}
-
-# Public subnet will be used for the Web Server and the Bastion
-resource "aws_subnet" "ex_public_sn" {
-  vpc_id                  = "${aws_vpc.ex_vpc.id}"
-  cidr_block              = "10.0.1.0/24"
-  map_public_ip_on_launch = true
-
-  tags {
-    "Name" = "Public Subnet"
-  }
-}
-
-# Private subnet will be used for the Backend Server
-resource "aws_subnet" "ex_private_sn" {
-  vpc_id     = "${aws_vpc.ex_vpc.id}"
-  cidr_block = "10.0.2.0/24"
-
-  tags {
-    "Name" = "Private Subnet"
-  }
-}
-
-# Internet Gateway will be attached to the VPC to enable 
-# public VPC instances to communicate with the internet
-resource "aws_internet_gateway" "ex_igw" {
-  vpc_id = "${aws_vpc.ex_vpc.id}"
-
-  tags {
-    "Name" = "Exercise VPC Internet Gateway"
-  }
-}
-
-# Public subnet routing table to all
-resource "aws_route_table" "ex_public_subnet_rt" {
-  vpc_id = "${aws_vpc.ex_vpc.id}"
-
-  # Forward traffic going to the internet through the internet gateway
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = "${aws_internet_gateway.ex_igw.id}"
-  }
-
-  tags {
-    "Name" = "Public Subnet RT"
-  }
-}
-
-# Link public subnet with the routing table to forward traffic outgoing
-# to the internet through the internet gateway
-resource "aws_route_table_association" "ex_public_subnet_rt_assc" {
-  route_table_id = "${aws_route_table.ex_public_subnet_rt.id}"
-  subnet_id      = "${aws_subnet.ex_public_sn.id}"
-}
-
 
 module "web_server" {
   source = "./modules/web-server"
@@ -167,7 +52,6 @@ resource "aws_key_pair" "public_key_pair" {
 data "local_file" "private_key_rsa" {
   filename = "keys/${var.ssh_key_file_name}"
 }
-
 
 module "bastion_server" {
   source = "./modules/bastion-server"
