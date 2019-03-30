@@ -1,7 +1,7 @@
 
 output "backend_private_ip" {
   description = "Backend server public ip"
-  value       = "${aws_instance.backend_server.private_ip}"
+  value       = "${module.backend_server.private_ip}"
 }
 
 

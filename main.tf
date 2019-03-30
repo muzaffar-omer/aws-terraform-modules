@@ -22,23 +22,9 @@ data "aws_eip" "web_server_eip" {
   }
 }
 
-module "web_server" {
-  source = "./modules/web-server"
-
-  ami_id = "${data.aws_ami.latest_ubuntu_ami.id}"
-  subnet_id = "${aws_subnet.ex_public_sn.id}"
-  key_name = "${aws_key_pair.public_key_pair.key_name}"
-  web_page_content = "<body><h1>Awesome Terraform !</h1></body>"
-  web_page_file_name = "${var.web_page_file_name}"
-  domain_name = "${var.domain_name}"
-  email = "${var.email}"
-  public_subnet_cidr = "${aws_subnet.ex_public_sn.cidr_block}"
-  vpc_id = "${aws_vpc.ex_vpc.id}"
-}
-
 # Link the web server to the elastic ip used in DNS
 resource "aws_eip_association" "web_server_eip_assc" {
-  instance_id = "${module.web_server.instance_id}"
+  instance_id   = "${module.web_server.instance_id}"
   allocation_id = "${data.aws_eip.web_server_eip.id}"
 }
 
@@ -53,49 +39,39 @@ data "local_file" "private_key_rsa" {
   filename = "keys/${var.ssh_key_file_name}"
 }
 
+module "web_server" {
+  source = "./modules/web-server"
+
+  ami_id             = "${data.aws_ami.latest_ubuntu_ami.id}"
+  subnet_id          = "${aws_subnet.ex_public_sn.id}"
+  key_name           = "${aws_key_pair.public_key_pair.key_name}"
+  web_page_content   = "<body><h1>Awesome Terraform !</h1></body>"
+  web_page_file_name = "${var.web_page_file_name}"
+  domain_name        = "${var.domain_name}"
+  email              = "${var.email}"
+  public_subnet_cidr = "${aws_subnet.ex_public_sn.cidr_block}"
+  vpc_id             = "${aws_vpc.ex_vpc.id}"
+}
+
 module "bastion_server" {
   source = "./modules/bastion-server"
 
-  ami_id = "${data.aws_ami.latest_ubuntu_ami.id}"
-  subnet_id = "${aws_subnet.ex_public_sn.id}"
-  aws_key_name = "${aws_key_pair.public_key_pair.key_name}"
-  public_subnet_cidr = "${aws_subnet.ex_public_sn.cidr_block}"
-  vpc_id = "${aws_vpc.ex_vpc.id}"
-  vpc_cidr_block = "${aws_vpc.ex_vpc.cidr_block}"
-  private_key_rsa = "${data.local_file.private_key_rsa.content}"
+  ami_id                = "${data.aws_ami.latest_ubuntu_ami.id}"
+  subnet_id             = "${aws_subnet.ex_public_sn.id}"
+  aws_key_name          = "${aws_key_pair.public_key_pair.key_name}"
+  public_subnet_cidr    = "${aws_subnet.ex_public_sn.cidr_block}"
+  vpc_id                = "${aws_vpc.ex_vpc.id}"
+  vpc_cidr_block        = "${aws_vpc.ex_vpc.cidr_block}"
+  private_key_rsa       = "${data.local_file.private_key_rsa.content}"
   private_key_file_name = "${var.ssh_key_file_name}"
 }
 
-# Backend server security group
-# - Enable only SSH traffic incoming from VPC instances only
-resource "aws_security_group" "backend_server_sg" {
-  description = "Backend server security group"
-  vpc_id      = "${aws_vpc.ex_vpc.id}"
+module "backend_server" {
+  source = "./modules/backend-server"
 
-  # Allow incoming SSH traffic coming from VPC instances only
-  ingress {
-    from_port   = "${var.ssh_port}"
-    to_port     = "${var.ssh_port}"
-    cidr_blocks = ["${aws_subnet.ex_public_sn.cidr_block}"]
-    protocol    = "tcp"
-  }
-
-  tags {
-    "Name" = "BackendServer SG"
-  }
-}
-
-# Backend server instance
-resource "aws_instance" "backend_server" {
-  ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
-  instance_type = "t2.micro"
-
-  vpc_security_group_ids = ["${aws_security_group.backend_server_sg.id}"]
-  subnet_id              = "${aws_subnet.ex_private_sn.id}"
-
-  key_name = "${aws_key_pair.public_key_pair.key_name}"
-
-  tags {
-    "Name" = "Backend Server"
-  }
+  ami_id                = "${data.aws_ami.latest_ubuntu_ami.id}"
+  subnet_id             = "${aws_subnet.ex_private_sn.id}"
+  aws_key_name          = "${aws_key_pair.public_key_pair.key_name}"
+  bastion_subnet_cidr    = "${aws_subnet.ex_public_sn.cidr_block}"
+  vpc_id                = "${aws_vpc.ex_vpc.id}"
 }
