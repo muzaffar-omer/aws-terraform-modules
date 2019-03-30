@@ -8,15 +8,6 @@ output "backend_private_ip" {
   value       = "${aws_instance.backend_server.private_ip}"
 }
 
-output "bastion_public_ip" {
-  description = "Bastion server public ip"
-  value       = "${aws_instance.bastion_server.public_ip}"
-}
-
-output "bastion_private_ip" {
-  description = "Bastion server private ip"
-  value       = "${aws_instance.bastion_server.private_ip}"
-}
 
 # Look for the latest Ubuntu 18.04 AMI
 data "aws_ami" "latest_ubuntu_ami" {
@@ -42,7 +33,7 @@ data "aws_eip" "web_server_eip" {
   }
 }
 
-variable "ssh_key" {
+variable "ssh_key_file_name" {
   description = "Name of the public key file, contents of this file will be used to create a key_pair in AWS"
   default     = "ex_key"
 }
@@ -160,8 +151,6 @@ module "web_server" {
   vpc_id = "${aws_vpc.ex_vpc.id}"
 }
 
-
-
 # Link the web server to the elastic ip used in DNS
 resource "aws_eip_association" "web_server_eip_assc" {
   instance_id = "${module.web_server.instance_id}"
@@ -171,70 +160,26 @@ resource "aws_eip_association" "web_server_eip_assc" {
 # Public key deployed in all created instances, to enable accessing the instances
 # using the private key of the key pair
 resource "aws_key_pair" "public_key_pair" {
-  public_key = "${file("keys/${var.ssh_key}.pub")}"
+  public_key = "${file("keys/${var.ssh_key_file_name}.pub")}"
   key_name   = "Ex Instances Public Key"
 }
 
-# Bastion server security group
-# - Enable SSH incoming from anywhere
-# - Enable SSH outgoing toward instances of the VPC only
-resource "aws_security_group" "bastion_sg" {
-  description = "Bastion server security group"
-  vpc_id      = "${aws_vpc.ex_vpc.id}"
-
-  # Allow incoming SSH traffic from everywhere
-  ingress {
-    from_port   = "${var.ssh_port}"
-    to_port     = "${var.ssh_port}"
-    cidr_blocks = "${var.all_hosts_cidr}"
-    protocol    = "tcp"
-  }
-
-  # Allow outgoing SSH traffic toward any instances in the VPC
-  egress {
-    from_port   = "${var.ssh_port}"
-    to_port     = "${var.ssh_port}"
-    cidr_blocks = ["${aws_vpc.ex_vpc.cidr_block}"]
-    protocol    = "tcp"
-  }
-
-  tags {
-    "Name" = "BastionServer SG"
-  }
+data "local_file" "private_key_rsa" {
+  filename = "keys/${var.ssh_key_file_name}"
 }
 
-# Bastion server instance
-resource "aws_instance" "bastion_server" {
-  ami           = "${data.aws_ami.latest_ubuntu_ami.id}"
-  instance_type = "t2.micro"
 
-  vpc_security_group_ids = ["${aws_security_group.bastion_sg.id}"]
-  subnet_id              = "${aws_subnet.ex_public_sn.id}"
+module "bastion_server" {
+  source = "./modules/bastion-server"
 
-  key_name = "${aws_key_pair.public_key_pair.key_name}"
-
-  connection {
-    type        = "ssh"
-    user        = "ubuntu"
-    private_key = "${file("keys/${var.ssh_key}")}"
-  }
-
-  # Transfer private key to Bastion
-  provisioner "file" {
-    source      = "keys/${var.ssh_key}"
-    destination = "~/${var.ssh_key}"
-  }
-
-  # Try connecting to the backend server from bastion server
-  provisioner "remote-exec" {
-    inline = [
-      "chmod 400 ~/${var.ssh_key}",
-    ]
-  }
-
-  tags {
-    "Name" = "Bastion Server"
-  }
+  ami_id = "${data.aws_ami.latest_ubuntu_ami.id}"
+  subnet_id = "${aws_subnet.ex_public_sn.id}"
+  aws_key_name = "${aws_key_pair.public_key_pair.key_name}"
+  public_subnet_cidr = "${aws_subnet.ex_public_sn.cidr_block}"
+  vpc_id = "${aws_vpc.ex_vpc.id}"
+  vpc_cidr_block = "${aws_vpc.ex_vpc.cidr_block}"
+  private_key_rsa = "${data.local_file.private_key_rsa.content}"
+  private_key_file_name = "${var.ssh_key_file_name}"
 }
 
 # Backend server security group
