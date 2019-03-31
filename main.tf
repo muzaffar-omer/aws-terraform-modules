@@ -73,24 +73,39 @@ module "web_server_cluster" {
   max_no_instances      = 4
 }
 
-module "bastion_server" {
-  source = "./modules/bastion-server"
+# module "bastion_server" {
+#   source = "./modules/bastion-server"
 
 
+#   ami_id                = "${data.aws_ami.latest_ubuntu_ami.id}"
+#   subnet_id             = "${aws_subnet.ex_public_sn.*.id[0]}"
+#   aws_key_name          = "${aws_key_pair.public_key_pair.key_name}"
+#   # public_subnet_cidr    = "${aws_subnet.ex_public_sn.cidr_block}"
+#   vpc_id                = "${aws_vpc.ex_vpc.id}"
+#   vpc_cidr_block        = "${aws_vpc.ex_vpc.cidr_block}"
+#   private_key_rsa       = "${data.local_file.private_key_rsa.content}"
+#   private_key_file_name = "${var.ssh_key_file_name}"
+# }
+
+
+module "bastion_server_cluster" {
+  source = "./modules/bastion-server-cluster"
+  
   ami_id                = "${data.aws_ami.latest_ubuntu_ami.id}"
-  subnet_id             = "${aws_subnet.ex_public_sn.*.id[0]}"
   aws_key_name          = "${aws_key_pair.public_key_pair.key_name}"
-  # public_subnet_cidr    = "${aws_subnet.ex_public_sn.cidr_block}"
+  subnet_ids             = ["${aws_subnet.ex_public_sn.*.id}"]
   vpc_id                = "${aws_vpc.ex_vpc.id}"
   vpc_cidr_block        = "${aws_vpc.ex_vpc.cidr_block}"
   private_key_rsa       = "${data.local_file.private_key_rsa.content}"
   private_key_file_name = "${var.ssh_key_file_name}"
+
+  min_no_instances = 2
+  max_no_instances = 4
 }
 
 
 # module "backend_server" {
 #   source = "./modules/backend-server"
-
 
 #   ami_id              = "${data.aws_ami.latest_ubuntu_ami.id}"
 #   subnet_id           = "${aws_subnet.ex_private_sn.id}"
