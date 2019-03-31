@@ -29,10 +29,6 @@ resource "aws_launch_template" "web_server_launch_template" {
   # Install nginx
   user_data = "${base64encode(data.template_file.deployment_script.rendered)}"
 
-  # provisioner "local-exec" {
-  #   command = "${data.template_file.web_page_deployment_validation.rendered}"
-  # }
-
   vpc_security_group_ids = ["${aws_security_group.web_server_sg.id}"]
 
   tag_specifications {
@@ -59,6 +55,15 @@ resource "aws_autoscaling_group" "web_server_autoscaling_group" {
     create_before_destroy = true
   }
 }
+
+resource "null_resource" "validate_web_page_deployment" {
+  provisioner "local-exec" {
+    command = "${data.template_file.web_page_deployment_validation.rendered}"
+  }
+
+  depends_on = ["aws_autoscaling_group.web_server_autoscaling_group"]
+}
+
 
 # Web server security group
 # - Enable incoming HTTP traffic from everywhere
