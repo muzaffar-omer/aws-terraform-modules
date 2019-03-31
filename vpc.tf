@@ -3,6 +3,7 @@ provider "aws" {
   region = "us-east-1"
 }
 
+data "aws_availability_zones" "all_availability_zones" {}
 
 # Use a separate VPC for the exercise
 resource "aws_vpc" "ex_vpc" {
@@ -16,19 +17,24 @@ resource "aws_vpc" "ex_vpc" {
 
 # Public subnet will be used for the Web Server and the Bastion
 resource "aws_subnet" "ex_public_sn" {
+  count = "${length(data.aws_availability_zones.all_availability_zones.names)}"
+
   vpc_id                  = "${aws_vpc.ex_vpc.id}"
-  cidr_block              = "10.0.1.0/24"
+  cidr_block              = "10.0.${20 + count.index}.0/24"
   map_public_ip_on_launch = true
+  availability_zone       = "${element(data.aws_availability_zones.all_availability_zones.names, count.index)}"
 
   tags {
     "Name" = "Public Subnet"
   }
 }
 
-# Private subnet will be used for the Backend Server
+# Private subnets will be used for the Backend Servers
 resource "aws_subnet" "ex_private_sn" {
-  vpc_id     = "${aws_vpc.ex_vpc.id}"
-  cidr_block = "10.0.2.0/24"
+  count             = "${length(data.aws_availability_zones.all_availability_zones.names)}"
+  vpc_id            = "${aws_vpc.ex_vpc.id}"
+  cidr_block        = "10.0.${1 + count.index}.0/24"
+  availability_zone = "${element(data.aws_availability_zones.all_availability_zones.names, count.index)}"
 
   tags {
     "Name" = "Private Subnet"
@@ -60,11 +66,13 @@ resource "aws_route_table" "ex_public_subnet_rt" {
   }
 }
 
-
 # Link public subnet with the routing table to forward traffic outgoing
 # to the internet through the internet gateway
 resource "aws_route_table_association" "ex_public_subnet_rt_assc" {
+  count = "${length(aws_subnet.ex_public_sn.*.id)}"
   route_table_id = "${aws_route_table.ex_public_subnet_rt.id}"
-  subnet_id      = "${aws_subnet.ex_public_sn.id}"
+  subnet_id      = "${element(aws_subnet.ex_public_sn.*.id, count.index)}"
+
+  depends_on = ["aws_subnet.ex_public_sn"]
 }
 
