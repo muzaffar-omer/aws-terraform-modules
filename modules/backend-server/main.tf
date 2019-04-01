@@ -7,6 +7,7 @@ resource "aws_security_group" "backend_server_sg" {
 
   tags {
     "Name" = "BackendServer SG"
+    "VPC" = "${var.vpc_id}"
   }
 }
 
@@ -22,6 +23,7 @@ resource "aws_instance" "backend_server" {
 
   tags {
     "Name" = "Backend Server"
+    "VPC" = "${var.vpc_id}"
   }
 }
 
@@ -35,6 +37,10 @@ resource "aws_security_group_rule" "allow_ssh_inbound" {
   to_port     = "${var.ssh_port}"
   cidr_blocks = ["${var.bastion_subnet_cidr}"]
   protocol    = "tcp"
+
+  tags = {
+    "VPC" = "${var.vpc_id}"
+  }
 }
 
 resource "aws_security_group_rule" "allow_http_outbound" {
@@ -48,6 +54,10 @@ resource "aws_security_group_rule" "allow_http_outbound" {
   to_port     = "${var.http_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
+
+  tags = {
+    "VPC" = "${var.vpc_id}"
+  }
 }
 
 resource "aws_security_group_rule" "allow_https_outbound" {
@@ -61,4 +71,8 @@ resource "aws_security_group_rule" "allow_https_outbound" {
   to_port     = "${var.https_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
+
+  tags = {
+    "VPC" = "${var.vpc_id}"
+  }
 }

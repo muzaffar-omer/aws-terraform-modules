@@ -7,6 +7,7 @@ resource "aws_security_group" "bastion_sg" {
 
   tags {
     "Name" = "BastionServer SG"
+    "VPC" = "${var.vpc_id}"
   }
 }
 
@@ -41,6 +42,7 @@ resource "aws_instance" "bastion_server" {
 
   tags {
     "Name" = "Bastion Server"
+    "VPC" = "${var.vpc_id}"
   }
 }
 
@@ -54,6 +56,10 @@ resource "aws_security_group_rule" "allow_ssh_inbound" {
   to_port     = "${var.ssh_port}"
   cidr_blocks = ["${var.all_hosts_cidr}"]
   protocol    = "tcp"
+
+  tags = {
+    "VPC" = "${var.vpc_id}"
+  }
 }
 
 resource "aws_security_group_rule" "allow_ssh_outbound" {
@@ -66,6 +72,10 @@ resource "aws_security_group_rule" "allow_ssh_outbound" {
   to_port     = "${var.ssh_port}"
   cidr_blocks = ["${var.vpc_cidr_block}"]
   protocol    = "tcp"
+
+  tags = {
+    "VPC" = "${var.vpc_id}"
+  }
 }
 
 resource "aws_security_group_rule" "allow_http_outbound" {
@@ -79,6 +89,10 @@ resource "aws_security_group_rule" "allow_http_outbound" {
   to_port     = "${var.http_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
+
+  tags = {
+    "VPC" = "${var.vpc_id}"
+  }
 }
 
 resource "aws_security_group_rule" "allow_https_outbound" {
@@ -92,4 +106,8 @@ resource "aws_security_group_rule" "allow_https_outbound" {
   to_port     = "${var.https_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
+
+  tags = {
+    "VPC" = "${var.vpc_id}"
+  }
 }

@@ -43,20 +43,6 @@ data "local_file" "public_key_rsa" {
   filename = "keys/${var.ssh_key_file_name}.pub"
 }
 
-# module "web_server" {
-#   source = "./modules/web-server"
-
-#   ami_id             = "${data.aws_ami.latest_ubuntu_ami.id}"
-#   subnet_id          = "${aws_subnet.ex_public_sn.id}"
-#   key_name           = "${aws_key_pair.public_key_pair.key_name}"
-#   web_page_content   = "<body><h1>Awesome Terraform !</h1></body>"
-#   web_page_file_name = "${var.web_page_file_name}"
-#   domain_name        = "${var.domain_name}"
-#   email              = "${var.email}"
-#   public_subnet_cidr = "${aws_subnet.ex_public_sn.cidr_block}"
-#   vpc_id             = "${aws_vpc.ex_vpc.id}"
-# }
-
 module "web_server_cluster" {
   source = "./modules/web-server-cluster"
 
@@ -72,19 +58,6 @@ module "web_server_cluster" {
   min_no_instances      = 2
   max_no_instances      = 4
 }
-
-# module "bastion_server" {
-#   source = "./modules/bastion-server"
-
-#   ami_id                = "${data.aws_ami.latest_ubuntu_ami.id}"
-#   subnet_id             = "${aws_subnet.ex_public_sn.*.id[0]}"
-#   aws_key_name          = "${aws_key_pair.public_key_pair.key_name}"
-#   # public_subnet_cidr    = "${aws_subnet.ex_public_sn.cidr_block}"
-#   vpc_id                = "${aws_vpc.ex_vpc.id}"
-#   vpc_cidr_block        = "${aws_vpc.ex_vpc.cidr_block}"
-#   private_key_rsa       = "${data.local_file.private_key_rsa.content}"
-#   private_key_file_name = "${var.ssh_key_file_name}"
-# }
 
 module "bastion_server_cluster" {
   source = "./modules/bastion-server-cluster"
@@ -113,13 +86,3 @@ module "backend_server_cluster" {
   min_no_instances    = 2
   max_no_instances    = 4
 }
-
-# module "backend_server" {
-#   source = "./modules/backend-server"
-
-#   ami_id              = "${data.aws_ami.latest_ubuntu_ami.id}"
-#   subnet_id           = "${aws_subnet.ex_private_sn.id}"
-#   aws_key_name        = "${aws_key_pair.public_key_pair.key_name}"
-#   bastion_subnet_cidr = "${aws_subnet.ex_public_sn.cidr_block}"
-#   vpc_id              = "${aws_vpc.ex_vpc.id}"
-# }

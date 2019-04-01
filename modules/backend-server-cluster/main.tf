@@ -11,7 +11,8 @@ resource "aws_launch_template" "backend_server_launch_template" {
       resource_type = "instance"
 
       tags = {
-          Name = "Backend Server Instance"
+          "Name" = "Backend Server Instance"
+          "VPC" = "${var.vpc_id}"
       }
   }
 }
@@ -30,6 +31,10 @@ resource "aws_autoscaling_group" "backend_server_autoscaling_group" {
   lifecycle {
     create_before_destroy = true
   }
+
+  tags {
+    "VPC" = "${var.vpc_id}"
+  }
 }
 
 # Backend server security group
@@ -40,6 +45,7 @@ resource "aws_security_group" "backend_server_sg" {
 
   tags {
     "Name" = "BackendServer SG"
+    "VPC" = "${var.vpc_id}"
   }
 }
 
@@ -53,6 +59,10 @@ resource "aws_security_group_rule" "allow_ssh_inbound" {
   to_port     = "${var.ssh_port}"
   cidr_blocks = ["${var.bastion_subnet_cidr}"]
   protocol    = "tcp"
+
+  tags {
+    "VPC" = "${var.vpc_id}"
+  }
 }
 
 resource "aws_security_group_rule" "allow_http_outbound" {
@@ -66,6 +76,10 @@ resource "aws_security_group_rule" "allow_http_outbound" {
   to_port     = "${var.http_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
+
+  tags {
+    "VPC" = "${var.vpc_id}"
+  }
 }
 
 resource "aws_security_group_rule" "allow_https_outbound" {
@@ -79,4 +93,8 @@ resource "aws_security_group_rule" "allow_https_outbound" {
   to_port     = "${var.https_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
+
+  tags {
+    "VPC" = "${var.vpc_id}"
+  }
 }
