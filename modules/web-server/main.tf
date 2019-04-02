@@ -4,10 +4,14 @@ data "template_file" "deployment_script" {
   template = "${file("${path.module}/install_nginx_and_certs.tpl")}"
 
   vars = {
-    web_page_file_name = "${var.web_page_file_name}"
-    web_page_content   = "${var.web_page_content}"
-    domain_name        = "${var.domain_name}"
-    email              = "${var.email}"
+    web_page_file_name  = "${var.web_page_file_name}"
+    web_page_content    = "${var.web_page_content}"
+    domain_name         = "${var.domain_name}"
+    email               = "${var.email}"
+    nginx_config        = "${file("${path.module}/nginx.config")}"
+    certificate_pem     = "${var.certificate_pem}"
+    certificate_key_pem = "${var.certificate_key_pem}"
+    issuer_pem          = "${var.issuer_pem}"
   }
 }
 
@@ -39,7 +43,7 @@ resource "aws_instance" "web_server" {
 
   tags {
     "Name" = "Nginx Web Server"
-    "VPC" = "${var.vpc_id}"
+    "VPC"  = "${var.vpc_id}"
   }
 }
 
@@ -53,7 +57,7 @@ resource "aws_security_group" "web_server_sg" {
 
   tags {
     "Name" = "Webserver SG"
-    "VPC" = "${var.vpc_id}"
+    "VPC"  = "${var.vpc_id}"
   }
 }
 
@@ -67,10 +71,6 @@ resource "aws_security_group_rule" "allow_http_inbound" {
   to_port     = "${var.http_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
-
-  tags = {
-    "VPC" = "${var.vpc_id}"
-  }
 }
 
 resource "aws_security_group_rule" "allow_https_inbound" {
@@ -83,26 +83,18 @@ resource "aws_security_group_rule" "allow_https_inbound" {
   to_port     = "${var.https_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
-
-  tags = {
-    "VPC" = "${var.vpc_id}"
-  }
 }
 
 resource "aws_security_group_rule" "allow_ssh_inbound" {
   type              = "ingress"
   security_group_id = "${aws_security_group.web_server_sg.id}"
 
-  # Allow incoming SSH traffic from VPC instances only
+  # Allow incoming SSH traffic from Bastion server only
 
-  from_port   = "${var.ssh_port}"
-  to_port     = "${var.ssh_port}"
-  cidr_blocks = ["${var.public_subnet_cidr}"]
+  from_port = "${var.ssh_port}"
+  to_port   = "${var.ssh_port}"
+  cidr_blocks = ["${var.bastion_server_cidr}"]
   protocol    = "tcp"
-
-  tags = {
-    "VPC" = "${var.vpc_id}"
-  }
 }
 
 resource "aws_security_group_rule" "allow_http_outbound" {
@@ -116,10 +108,6 @@ resource "aws_security_group_rule" "allow_http_outbound" {
   to_port     = "${var.http_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
-
-  tags = {
-    "VPC" = "${var.vpc_id}"
-  }
 }
 
 resource "aws_security_group_rule" "allow_https_outbound" {
@@ -133,8 +121,4 @@ resource "aws_security_group_rule" "allow_https_outbound" {
   to_port     = "${var.https_port}"
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
-
-  tags = {
-    "VPC" = "${var.vpc_id}"
-  }
 }

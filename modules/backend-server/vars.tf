@@ -31,7 +31,7 @@ variable "all_hosts_cidr" {
   default = ["0.0.0.0/0"]
 }
 
-variable "bastion_subnet_cidr" {
+variable "bastion_server_cidr" {
   
 }
 

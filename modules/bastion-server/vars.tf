@@ -31,7 +31,7 @@ variable "all_hosts_cidr" {
   default = ["0.0.0.0/0"]
 }
 
-variable "private_key_rsa" {
+variable "private_key_pem" {
   
 }
 

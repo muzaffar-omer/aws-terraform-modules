@@ -28,51 +28,13 @@ resource "aws_instance" "backend_server" {
 }
 
 resource "aws_security_group_rule" "allow_ssh_inbound" {
-  type              = "egress"
+  type              = "ingress"
   security_group_id = "${aws_security_group.backend_server_sg.id}"
 
   # Allow incoming SSH traffic from within the VPC only
 
   from_port   = "${var.ssh_port}"
   to_port     = "${var.ssh_port}"
-  cidr_blocks = ["${var.bastion_subnet_cidr}"]
+  cidr_blocks = ["${var.bastion_server_cidr}"]
   protocol    = "tcp"
-
-  tags = {
-    "VPC" = "${var.vpc_id}"
-  }
-}
-
-resource "aws_security_group_rule" "allow_http_outbound" {
-  type              = "egress"
-  security_group_id = "${aws_security_group.backend_server_sg.id}"
-
-  # Allow outgoing HTTP traffic to everywhere, this enables
-  # installation and update of packages using apt-get
-  from_port = "${var.http_port}"
-
-  to_port     = "${var.http_port}"
-  cidr_blocks = "${var.all_hosts_cidr}"
-  protocol    = "tcp"
-
-  tags = {
-    "VPC" = "${var.vpc_id}"
-  }
-}
-
-resource "aws_security_group_rule" "allow_https_outbound" {
-  type              = "egress"
-  security_group_id = "${aws_security_group.backend_server_sg.id}"
-
-  # Allow outgoing HTTPS traffic to everywhere, this enables
-  # installation of signing certificates required during installation of apt-get packages
-  from_port = "${var.https_port}"
-
-  to_port     = "${var.https_port}"
-  cidr_blocks = "${var.all_hosts_cidr}"
-  protocol    = "tcp"
-
-  tags = {
-    "VPC" = "${var.vpc_id}"
-  }
 }

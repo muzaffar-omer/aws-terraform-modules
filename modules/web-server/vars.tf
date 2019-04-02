@@ -45,11 +45,27 @@ variable "ssh_port" {
   default = "22"
 }
 
-variable "public_subnet_cidr" {
-  description = "CIDR block of the public subnet of the bastion server, this is used to allow SSH traffic coming from bastion server"
-}
-
 variable "all_hosts_cidr" {
   default = ["0.0.0.0/0"]
 }
+
+variable "certificate_pem" {
+  
+}
+
+variable "certificate_key_pem" {
+  
+}
+
+variable "issuer_pem" {
+  
+}
+
+variable "bastion_server_cidr" {
+  
+}
+
+
+
+
 

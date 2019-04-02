@@ -40,6 +40,6 @@ variable "max_no_instances" {
 }
 
 
-variable "bastion_subnet_cidr" {
+variable "bastion_server_cidr" {
   
 }

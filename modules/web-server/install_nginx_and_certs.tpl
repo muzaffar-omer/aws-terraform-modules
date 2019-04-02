@@ -4,11 +4,12 @@ apt-get update -y
 apt-get install -y nginx
 echo "${web_page_content}" > "/var/www/html/${web_page_file_name}"
 echo "Installed nginx !"
-echo "Installing cerbot ..."
-apt-get install -y software-properties-common
-add-apt-repository universe
-add-apt-repository ppa:certbot/certbot
-apt-get update -y
-apt-get install -y certbot python-certbot-nginx 
-certbot run --nginx --non-interactive --email ${email}  --domain ${domain_name} --verbose --webroot-path /var/www/html/ --agree-tos
+mkdir /root/certs/
+mv /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default.backup
+echo "${nginx_config}" > /etc/nginx/sites-enabled/default
+echo "${certificate_pem}" > /root/certs/certificate
+echo "${issuer_pem}" >> /root/certs/certificate
+echo "${certificate_key_pem}" > /root/certs/certificate_key
+
+service nginx restart 
 echo "Installed the certificate !"
