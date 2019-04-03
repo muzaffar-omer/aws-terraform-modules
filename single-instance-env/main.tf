@@ -24,12 +24,13 @@ data "tls_public_key" "public_key" {
 # using the private key of the key pair
 resource "aws_key_pair" "public_key_pair" {
   public_key = "${data.tls_public_key.public_key.public_key_openssh}"
-  key_name   = "ExInstancesPublicKey"
 }
 
 module "issue_certificate" {
+  new_certificate = "${var.issue_new_certificate}"
   source = "../modules/issue-certificate"
 }
+
 
 module "web_server" {
   source = "../modules/web-server"
@@ -43,9 +44,9 @@ module "web_server" {
   email               = "${var.email}"
   bastion_server_cidr = "${module.bastion_server.private_ip}/32"
   vpc_id              = "${aws_vpc.vpc.id}"
-  certificate_pem     = "${module.issue_certificate.certificate_pem}"
-  certificate_key_pem = "${module.issue_certificate.certificate_key_pem}"
-  issuer_pem          = "${module.issue_certificate.issuer_pem}"
+  certificate_pem     = "${module.issue_certificate.certificate_pem[0]}"
+  certificate_key_pem = "${module.issue_certificate.certificate_key_pem[0]}"
+  issuer_pem          = "${module.issue_certificate.issuer_pem[0]}"
 }
 
 module "register_web_server_dns" {

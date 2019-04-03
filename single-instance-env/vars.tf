@@ -41,3 +41,8 @@ variable "email" {
 variable "availability_zone" {
   default = "us-east-1a"
 }
+
+variable "issue_new_certificate" {
+  default = 0
+}
+

@@ -32,12 +32,12 @@ resource "aws_launch_template" "web_server_launch_template" {
   vpc_security_group_ids = ["${aws_security_group.web_server_sg.id}"]
 
   tag_specifications {
-      resource_type = "instance"
+    resource_type = "instance"
 
-      tags = {
-          Name = "Webserver Instance"
-          "VPC" = "${var.vpc_id}"
-      }
+    tags = {
+      Name  = "Webserver Instance"
+      "VPC" = "${var.vpc_id}"
+    }
   }
 }
 
@@ -48,27 +48,44 @@ resource "aws_autoscaling_group" "web_server_autoscaling_group" {
     id = "${aws_launch_template.web_server_launch_template.id}"
   }
 
-  min_size           = "${var.min_no_instances}"
-  max_size           = "${var.max_no_instances}"
+  min_size            = "${var.min_no_instances}"
+  max_size            = "${var.max_no_instances}"
   vpc_zone_identifier = ["${var.subnet_ids}"]
 
   lifecycle {
     create_before_destroy = true
   }
 
-  tags {
+  tag {
+    key = "VPC"
+    value = "${var.vpc_id}"
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_lb" "web_server_cluster_lb" {
+  name               = "WebServerClusterLB"
+  internal           = false
+  security_groups    = ["${aws_security_group.lb_sg.id}"]
+  subnets            = ["${var.subnet_ids}"]
+
+  tags = {
     "VPC" = "${var.vpc_id}"
   }
 }
 
-resource "null_resource" "validate_web_page_deployment" {
-  provisioner "local-exec" {
-    command = "${data.template_file.web_page_deployment_validation.rendered}"
-  }
-
-  depends_on = ["aws_autoscaling_group.web_server_autoscaling_group"]
+resource "aws_autoscaling_attachment" "web_server_asg_and_lb_attachment" {
+  autoscaling_group_name = "${aws_autoscaling_group.web_server_autoscaling_group.id}"
+  elb                    = "${aws_lb.web_server_cluster_lb.id}"
 }
 
+# resource "null_resource" "validate_web_page_deployment" {
+#   provisioner "local-exec" {
+#     command = "${data.template_file.web_page_deployment_validation.rendered}"
+#   }
+
+#   depends_on = ["aws_autoscaling_group.web_server_autoscaling_group"]
+# }
 
 # Web server security group
 # - Enable incoming HTTP traffic from everywhere
@@ -80,13 +97,23 @@ resource "aws_security_group" "web_server_sg" {
 
   tags {
     "Name" = "Webserver SG"
-    "VPC" = "${var.vpc_id}"
+    "VPC"  = "${var.vpc_id}"
   }
 }
 
-resource "aws_security_group_rule" "allow_http_inbound" {
+resource "aws_security_group" "lb_sg" {
+  description = "Load balancer security group"
+  vpc_id      = "${var.vpc_id}"
+
+  tags {
+    "Name" = "WebServerLB SG"
+    "VPC"  = "${var.vpc_id}"
+  }
+}
+
+resource "aws_security_group_rule" "lb_allow_http_inbound" {
   type              = "ingress"
-  security_group_id = "${aws_security_group.web_server_sg.id}"
+  security_group_id = "${aws_security_group.lb_sg.id}"
 
   # Allow incoming HTTP traffic from everywhere
 
@@ -96,9 +123,9 @@ resource "aws_security_group_rule" "allow_http_inbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_https_inbound" {
+resource "aws_security_group_rule" "lb_allow_https_inbound" {
   type              = "ingress"
-  security_group_id = "${aws_security_group.web_server_sg.id}"
+  security_group_id = "${aws_security_group.lb_sg.id}"
 
   # Allow incoming HTTPS traffic from everywhere
 
@@ -108,7 +135,7 @@ resource "aws_security_group_rule" "allow_https_inbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_ssh_inbound" {
+resource "aws_security_group_rule" "web_server_allow_ssh_inbound" {
   type              = "ingress"
   security_group_id = "${aws_security_group.web_server_sg.id}"
 
@@ -120,7 +147,7 @@ resource "aws_security_group_rule" "allow_ssh_inbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_http_outbound" {
+resource "aws_security_group_rule" "web_server_allow_http_outbound" {
   type              = "egress"
   security_group_id = "${aws_security_group.web_server_sg.id}"
 
@@ -133,7 +160,7 @@ resource "aws_security_group_rule" "allow_http_outbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_https_outbound" {
+resource "aws_security_group_rule" "web_server_allow_https_outbound" {
   type              = "egress"
   security_group_id = "${aws_security_group.web_server_sg.id}"
 
