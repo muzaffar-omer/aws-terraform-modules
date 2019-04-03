@@ -62,8 +62,6 @@ resource "aws_security_group_rule" "allow_ssh_outbound" {
   type              = "egress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
 
-  # Allow incoming SSH traffic from everywhere
-
   from_port   = "${var.ssh_port}"
   to_port     = "${var.ssh_port}"
   cidr_blocks = ["${var.vpc_cidr_block}"]

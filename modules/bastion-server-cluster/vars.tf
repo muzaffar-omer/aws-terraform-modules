@@ -39,7 +39,7 @@ variable "max_no_instances" {
   
 }
 
-variable "private_key_rsa" {
+variable "private_key_pem" {
   
 }
 

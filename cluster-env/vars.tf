@@ -1,7 +1,7 @@
 
 variable "ssh_key_file_name" {
   description = "Name of the public key file, contents of this file will be used to create a key_pair in AWS"
-  default     = "ex_key"
+  default     = "private.pem"
 }
 
 variable "http_port" {

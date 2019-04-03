@@ -16,20 +16,8 @@ data "aws_ami" "latest_ubuntu_ami" {
   most_recent = true
 }
 
-data "aws_eip" "web_server_eip" {
-  tags = {
-    Name = "WSStaticIP"
-  }
-}
-
 data "tls_public_key" "public_key" {
   private_key_pem = "${file("../keys/${var.ssh_key_file_name}")}"
-}
-
-# Link the web server to the elastic ip used in DNS
-resource "aws_eip_association" "web_server_eip_assc" {
-  instance_id   = "${module.web_server.instance_id}"
-  allocation_id = "${data.aws_eip.web_server_eip.id}"
 }
 
 # Public key deployed in all created instances, to enable accessing the instances
@@ -58,6 +46,13 @@ module "web_server" {
   certificate_pem     = "${module.issue_certificate.certificate_pem}"
   certificate_key_pem = "${module.issue_certificate.certificate_key_pem}"
   issuer_pem          = "${module.issue_certificate.issuer_pem}"
+}
+
+module "register_web_server_dns" {
+  source = "../modules/register-dns-record"
+
+  domain_name    = "${var.domain_name}"
+  dns_name_or_ip = "${module.web_server.public_dns_name}"
 }
 
 module "bastion_server" {

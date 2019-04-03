@@ -2,8 +2,8 @@ data "template_file" "private_key_deployment_script" {
   template = "${file("${path.module}/deploy_private_key.tpl")}"
 
   vars = {
-    private_key_rsa = "${var.private_key_rsa}"
-    private_key_file_name   = "${var.private_key_file_name}"
+    private_key_pem       = "${var.private_key_pem}"
+    private_key_file_name = "${var.private_key_file_name}"
   }
 }
 
@@ -14,16 +14,16 @@ resource "aws_launch_template" "bastion_server_launch_template" {
   key_name      = "${var.aws_key_name}"
 
   # Install nginx
-  user_data = "${base64encode(data.template_file.private_key_deployment_script.rendered)}"
+  user_data              = "${base64encode(data.template_file.private_key_deployment_script.rendered)}"
   vpc_security_group_ids = ["${aws_security_group.bastion_sg.id}"]
 
   tag_specifications {
-      resource_type = "instance"
+    resource_type = "instance"
 
-      tags = {
-          "Name" = "Bastion Server Instance"
-          "VPC" = "${var.vpc_id}"
-      }
+    tags = {
+      "Name" = "Bastion Server Instance"
+      "VPC"  = "${var.vpc_id}"
+    }
   }
 }
 
@@ -34,16 +34,18 @@ resource "aws_autoscaling_group" "bastion_server_autoscaling_group" {
     id = "${aws_launch_template.bastion_server_launch_template.id}"
   }
 
-  min_size           = "${var.min_no_instances}"
-  max_size           = "${var.max_no_instances}"
+  min_size            = "${var.min_no_instances}"
+  max_size            = "${var.max_no_instances}"
   vpc_zone_identifier = ["${var.subnet_ids}"]
 
   lifecycle {
     create_before_destroy = true
   }
 
-  tags {
-    "VPC" = "${var.vpc_id}"
+  tag {
+    key                 = "VPC"
+    value               = "${var.vpc_id}"
+    propagate_at_launch = true
   }
 }
 
@@ -56,7 +58,7 @@ resource "aws_security_group" "bastion_sg" {
 
   tags {
     "Name" = "BastionServer SG"
-    "VPC" = "${var.vpc_id}"
+    "VPC"  = "${var.vpc_id}"
   }
 }
 
@@ -75,8 +77,6 @@ resource "aws_security_group_rule" "allow_ssh_inbound" {
 resource "aws_security_group_rule" "allow_ssh_outbound" {
   type              = "egress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
-
-  # Allow incoming SSH traffic from everywhere
 
   from_port   = "${var.ssh_port}"
   to_port     = "${var.ssh_port}"
@@ -109,4 +109,3 @@ resource "aws_security_group_rule" "allow_https_outbound" {
   cidr_blocks = "${var.all_hosts_cidr}"
   protocol    = "tcp"
 }
-
