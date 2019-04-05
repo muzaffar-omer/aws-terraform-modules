@@ -12,6 +12,7 @@ variable "ttl" {
 }
 
 variable "dns_name_or_ip" {
+  description = "DNS name or IP to be configured in the DNS record"
 }
 
 

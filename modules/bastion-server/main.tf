@@ -1,16 +1,3 @@
-# Bastion server security group
-# - Enable SSH incoming from anywhere
-# - Enable SSH outgoing toward instances of the VPC only
-resource "aws_security_group" "bastion_sg" {
-  description = "Bastion server security group"
-  vpc_id      = "${var.vpc_id}"
-
-  tags {
-    "Name" = "BastionServer SG"
-    "VPC" = "${var.vpc_id}"
-  }
-}
-
 # Bastion server instance
 resource "aws_instance" "bastion_server" {
   ami           = "${var.ami_id}"
@@ -33,7 +20,7 @@ resource "aws_instance" "bastion_server" {
     destination = "~/${var.private_key_file_name}"
   }
 
-  # Try connecting to the backend server from bastion server
+  # Update the permission of the private key pem file in Bastion server
   provisioner "remote-exec" {
     inline = [
       "chmod 400 ~/${var.private_key_file_name}",
@@ -46,11 +33,23 @@ resource "aws_instance" "bastion_server" {
   }
 }
 
-resource "aws_security_group_rule" "allow_ssh_inbound" {
+# Bastion server security group
+# - Enable SSH incoming from anywhere
+# - Enable SSH outgoing toward instances of the VPC only
+resource "aws_security_group" "bastion_sg" {
+  description = "Bastion server security group"
+  vpc_id      = "${var.vpc_id}"
+
+  tags {
+    "Name" = "BastionServer SG"
+    "VPC" = "${var.vpc_id}"
+  }
+}
+
+# Allow incoming SSH traffic from everywhere
+resource "aws_security_group_rule" "allow_ssh_inbound_rule" {
   type              = "ingress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
-
-  # Allow incoming SSH traffic from everywhere
 
   from_port   = "${var.ssh_port}"
   to_port     = "${var.ssh_port}"
@@ -58,7 +57,7 @@ resource "aws_security_group_rule" "allow_ssh_inbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_ssh_outbound" {
+resource "aws_security_group_rule" "allow_ssh_outbound_rule" {
   type              = "egress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
 
@@ -68,12 +67,12 @@ resource "aws_security_group_rule" "allow_ssh_outbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_http_outbound" {
+# Allow outgoing HTTP traffic to everywhere, this enables
+# installation and update of packages using apt-get
+resource "aws_security_group_rule" "allow_http_outbound_rule" {
   type              = "egress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
 
-  # Allow outgoing HTTP traffic to everywhere, this enables
-  # installation and update of packages using apt-get
   from_port = "${var.http_port}"
 
   to_port     = "${var.http_port}"
@@ -81,12 +80,12 @@ resource "aws_security_group_rule" "allow_http_outbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_https_outbound" {
+# Allow outgoing HTTPS traffic to everywhere, this enables
+# installation of signing certificates required during installation of apt-get packages
+resource "aws_security_group_rule" "allow_https_outbound_rule" {
   type              = "egress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
 
-  # Allow outgoing HTTPS traffic to everywhere, this enables
-  # installation of signing certificates required during installation of apt-get packages
   from_port = "${var.https_port}"
 
   to_port     = "${var.https_port}"

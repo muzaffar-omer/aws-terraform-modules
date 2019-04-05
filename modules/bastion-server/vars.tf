@@ -1,14 +1,12 @@
 variable "vpc_id" {
-  description = "Used in the web server security group"
 }
 
-
 variable "ami_id" {
-  description = "ID of the AMI image to be used for creation of the web server"
+  description = "ID of the AMI image to be used for creation of instance"
 }
 
 variable "subnet_id" {
-  description = "ID of the subnet where the web server will be deployed"
+  description = "ID of the subnet where the bastion server will be deployed"
 }
 
 variable "aws_key_name" {
@@ -32,15 +30,13 @@ variable "all_hosts_cidr" {
 }
 
 variable "private_key_pem" {
-  
+  description = "Private key pem content to be transferred into the bastion instance to access other instances"
 }
 
 variable "private_key_file_name" {
-  
+  description = "Name of the file to store the private key pem"
 }
 
 variable "vpc_cidr_block" {
-  
+  description = "CIDR of the VPC private IPs, used to allow outgoing SSH traffic from bastion to other instances"
 }
-
-

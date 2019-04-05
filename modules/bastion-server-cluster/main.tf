@@ -1,5 +1,6 @@
+# Script to deploy the private key pem in bastion server to be used for accessing other instances through SSH
 data "template_file" "private_key_deployment_script" {
-  template = "${file("${path.module}/deploy_private_key.tpl")}"
+  template = "${file("${path.module}/templates/deploy_private_key.tpl")}"
 
   vars = {
     private_key_pem       = "${var.private_key_pem}"
@@ -13,7 +14,6 @@ resource "aws_launch_template" "bastion_server_launch_template" {
   instance_type = "t2.micro"
   key_name      = "${var.aws_key_name}"
 
-  # Install nginx
   user_data              = "${base64encode(data.template_file.private_key_deployment_script.rendered)}"
   vpc_security_group_ids = ["${aws_security_group.bastion_sg.id}"]
 
@@ -62,11 +62,10 @@ resource "aws_security_group" "bastion_sg" {
   }
 }
 
-resource "aws_security_group_rule" "allow_ssh_inbound" {
+# Allow incoming SSH traffic from everywhere
+resource "aws_security_group_rule" "allow_ssh_inbound_rule" {
   type              = "ingress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
-
-  # Allow incoming SSH traffic from everywhere
 
   from_port   = "${var.ssh_port}"
   to_port     = "${var.ssh_port}"
@@ -74,7 +73,7 @@ resource "aws_security_group_rule" "allow_ssh_inbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_ssh_outbound" {
+resource "aws_security_group_rule" "allow_ssh_outbound_rule" {
   type              = "egress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
 
@@ -84,12 +83,13 @@ resource "aws_security_group_rule" "allow_ssh_outbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_http_outbound" {
+# Allow outgoing HTTP traffic to everywhere, this enables
+# installation and update of packages using apt-get
+resource "aws_security_group_rule" "allow_http_outbound_rule" {
   type              = "egress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
 
-  # Allow outgoing HTTP traffic to everywhere, this enables
-  # installation and update of packages using apt-get
+
   from_port = "${var.http_port}"
 
   to_port     = "${var.http_port}"
@@ -97,12 +97,12 @@ resource "aws_security_group_rule" "allow_http_outbound" {
   protocol    = "tcp"
 }
 
-resource "aws_security_group_rule" "allow_https_outbound" {
+# Allow outgoing HTTPS traffic to everywhere, this enables
+# installation of signing certificates required during installation of apt-get packages
+resource "aws_security_group_rule" "allow_https_outbound_rule" {
   type              = "egress"
   security_group_id = "${aws_security_group.bastion_sg.id}"
 
-  # Allow outgoing HTTPS traffic to everywhere, this enables
-  # installation of signing certificates required during installation of apt-get packages
   from_port = "${var.https_port}"
 
   to_port     = "${var.https_port}"

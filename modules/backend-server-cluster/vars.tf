@@ -41,5 +41,5 @@ variable "max_no_instances" {
 
 
 variable "bastion_server_cidr" {
-  
+  description = "Bastion servers IPs CIDR"
 }

@@ -43,6 +43,6 @@ variable "availability_zone" {
 }
 
 variable "issue_new_certificate" {
-  default = 0
+  default = true
 }
 

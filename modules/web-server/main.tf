@@ -1,28 +1,32 @@
-# Template to parsed into a shell script that will be 
+# Template parsed into a shell script that will be 
 # executed during web server instance creation, it will be used as AWS user data
+# output script will perform the below actions:
+# - Installs nginx
+# - Create the web page file in the nginx web-root directory
+# - Create certificate artifacts to be used by nginx for HTTPS
 data "template_file" "deployment_script" {
-  template = "${file("${path.module}/install_nginx_and_certs.tpl")}"
+  template = "${file("${path.module}/templates/install_nginx_and_certs.tpl")}"
 
   vars = {
     web_page_file_name  = "${var.web_page_file_name}"
     web_page_content    = "${var.web_page_content}"
     domain_name         = "${var.domain_name}"
     email               = "${var.email}"
-    nginx_config        = "${file("${path.module}/nginx.config")}"
+    nginx_config        = "${file("${path.module}/templates/nginx.config")}"
     certificate_pem     = "${var.certificate_pem}"
     certificate_key_pem = "${var.certificate_key_pem}"
     issuer_pem          = "${var.issuer_pem}"
   }
 }
 
-data "template_file" "web_page_deployment_validation" {
-  template = "${file("${path.module}/validate_web_page_deployment.tpl")}"
+# data "template_file" "web_page_deployment_validation" {
+#   template = "${file("${path.module}/templates/validate_web_page_deployment.tpl")}"
 
-  vars = {
-    web_page_name = "${var.web_page_file_name}"
-    domain_name   = "${var.domain_name}"
-  }
-}
+#   vars = {
+#     web_page_name = "${var.web_page_file_name}"
+#     domain_name   = "${var.domain_name}"
+#   }
+# }
 
 # Web server instance
 resource "aws_instance" "web_server" {

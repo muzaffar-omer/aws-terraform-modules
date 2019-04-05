@@ -1,14 +1,13 @@
 variable "vpc_id" {
-  description = "Used in the web server security group"
 }
 
 
 variable "ami_id" {
-  description = "ID of the AMI image to be used for creation of the web server"
+  description = "ID of the AMI image to be used for creation of the instance"
 }
 
 variable "subnet_id" {
-  description = "ID of the subnet where the web server will be deployed"
+  description = "ID of the subnet where the instance will be deployed"
 }
 
 variable "aws_key_name" {
@@ -32,7 +31,7 @@ variable "all_hosts_cidr" {
 }
 
 variable "bastion_server_cidr" {
-  
+  description = "Bastion server IP CIDR"
 }
 
 

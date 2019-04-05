@@ -38,3 +38,7 @@ variable "email" {
   description = "Email address used during deployment of certificates"
   default = "muzaffar.omer@gmail.com"
 }
+
+variable "issue_new_certificate" {
+  default = true
+}

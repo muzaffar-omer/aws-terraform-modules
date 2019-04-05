@@ -50,19 +50,19 @@ variable "all_hosts_cidr" {
 }
 
 variable "certificate_pem" {
-  
+  description = "Certificate (public key) PEM content"
 }
 
 variable "certificate_key_pem" {
-  
+  description = "Certificate key (private key) PEM content"
 }
 
 variable "issuer_pem" {
-  
+  description = "Intermediate issuer certificate (public key) PEM content"
 }
 
 variable "bastion_server_cidr" {
-  
+  description = "Bastion server IP CIDR, used to allow SSH from bastion server only"
 }
 
 

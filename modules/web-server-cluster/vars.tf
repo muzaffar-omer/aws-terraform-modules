@@ -54,6 +54,19 @@ variable "all_hosts_cidr" {
   default = ["0.0.0.0/0"]
 }
 
+
+variable "certificate_pem" {
+  
+}
+
+variable "certificate_key_pem" {
+  
+}
+
+variable "issuer_pem" {
+  
+}
+
 variable "min_no_instances" {
   
 }
@@ -62,3 +75,6 @@ variable "max_no_instances" {
   
 }
 
+variable "tls_certificate_arn" {
+  
+}

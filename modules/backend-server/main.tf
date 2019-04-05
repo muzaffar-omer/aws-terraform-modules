@@ -1,16 +1,3 @@
-
-# Backend server security group
-# - Enable only SSH traffic incoming from VPC instances only
-resource "aws_security_group" "backend_server_sg" {
-  description = "Backend server security group"
-  vpc_id      = "${var.vpc_id}"
-
-  tags {
-    "Name" = "BackendServer SG"
-    "VPC" = "${var.vpc_id}"
-  }
-}
-
 # Backend server instance
 resource "aws_instance" "backend_server" {
   ami           = "${var.ami_id}"
@@ -27,11 +14,22 @@ resource "aws_instance" "backend_server" {
   }
 }
 
-resource "aws_security_group_rule" "allow_ssh_inbound" {
+# Backend server security group
+# - Enable only SSH traffic incoming from bastion instances only
+resource "aws_security_group" "backend_server_sg" {
+  description = "Backend server security group"
+  vpc_id      = "${var.vpc_id}"
+
+  tags {
+    "Name" = "BackendServer SG"
+    "VPC" = "${var.vpc_id}"
+  }
+}
+
+# Allow incoming SSH traffic from bastion server only
+resource "aws_security_group_rule" "allow_ssh_inbound_rule" {
   type              = "ingress"
   security_group_id = "${aws_security_group.backend_server_sg.id}"
-
-  # Allow incoming SSH traffic from within the VPC only
 
   from_port   = "${var.ssh_port}"
   to_port     = "${var.ssh_port}"

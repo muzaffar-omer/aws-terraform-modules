@@ -33,7 +33,9 @@ resource "aws_autoscaling_group" "backend_server_autoscaling_group" {
   }
 
   tags {
-    "VPC" = "${var.vpc_id}"
+    key = "VPC"
+    value = "${var.vpc_id}"
+    propagate_at_launch = true
   }
 }
 
@@ -49,11 +51,10 @@ resource "aws_security_group" "backend_server_sg" {
   }
 }
 
-resource "aws_security_group_rule" "allow_ssh_inbound" {
+# Allow incoming traffic from bastion server only
+resource "aws_security_group_rule" "allow_ssh_inbound_rule" {
   type              = "ingress"
   security_group_id = "${aws_security_group.backend_server_sg.id}"
-
-  # Allow incoming SSH traffic from within the VPC only
 
   from_port   = "${var.ssh_port}"
   to_port     = "${var.ssh_port}"

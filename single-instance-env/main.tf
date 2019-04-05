@@ -1,3 +1,54 @@
+# A single instance of web server configured with nginx and HTTPS
+# to serve the static web page
+module "web_server" {
+  source = "../modules/web-server"
+
+  ami_id              = "${data.aws_ami.latest_ubuntu_ami.id}"
+  subnet_id           = "${aws_subnet.public_sn.id}"
+  key_name            = "${aws_key_pair.public_key_pair.key_name}"
+  web_page_content    = "${file(var.web_page_file_name)}"
+  web_page_file_name  = "${var.web_page_file_name}"
+  domain_name         = "${var.domain_name}"
+  email               = "${var.email}"
+  bastion_server_cidr = "${module.bastion_server.private_ip}/32"
+  vpc_id              = "${aws_vpc.vpc.id}"
+  certificate_pem     = "${module.issue_certificate.certificate_pem}"
+  certificate_key_pem = "${module.issue_certificate.certificate_key_pem}"
+  issuer_pem          = "${module.issue_certificate.issuer_pem}"
+}
+
+# Configure the web server instance DNS name in the hosted zone DNS table
+module "register_web_server_dns" {
+  source = "../modules/register-dns-record"
+
+  domain_name    = "${var.domain_name}"
+  dns_name_or_ip = "${module.web_server.public_dns_name}"
+}
+
+# Bastion server instance
+module "bastion_server" {
+  source = "../modules/bastion-server"
+
+  ami_id                = "${data.aws_ami.latest_ubuntu_ami.id}"
+  subnet_id             = "${aws_subnet.public_sn.id}"
+  aws_key_name          = "${aws_key_pair.public_key_pair.key_name}"
+  vpc_id                = "${aws_vpc.vpc.id}"
+  vpc_cidr_block        = "${aws_vpc.vpc.cidr_block}"
+  private_key_pem       = "${file("../keys/${var.ssh_key_file_name}")}"
+  private_key_file_name = "${var.ssh_key_file_name}"
+}
+
+# Backend server instance
+module "backend_server" {
+  source = "../modules/backend-server"
+
+  ami_id              = "${data.aws_ami.latest_ubuntu_ami.id}"
+  subnet_id           = "${aws_subnet.private_sn.id}"
+  aws_key_name        = "${aws_key_pair.public_key_pair.key_name}"
+  bastion_server_cidr = "${module.bastion_server.private_ip}/32"
+  vpc_id              = "${aws_vpc.vpc.id}"
+}
+
 # Look for the latest Ubuntu 18.04 AMI
 data "aws_ami" "latest_ubuntu_ami" {
   owners = ["099720109477"] # Canonical (official owner of ubuntu) Owner ID
@@ -29,51 +80,4 @@ resource "aws_key_pair" "public_key_pair" {
 module "issue_certificate" {
   new_certificate = "${var.issue_new_certificate}"
   source = "../modules/issue-certificate"
-}
-
-
-module "web_server" {
-  source = "../modules/web-server"
-
-  ami_id              = "${data.aws_ami.latest_ubuntu_ami.id}"
-  subnet_id           = "${aws_subnet.public_sn.id}"
-  key_name            = "${aws_key_pair.public_key_pair.key_name}"
-  web_page_content    = "${file(var.web_page_file_name)}"
-  web_page_file_name  = "${var.web_page_file_name}"
-  domain_name         = "${var.domain_name}"
-  email               = "${var.email}"
-  bastion_server_cidr = "${module.bastion_server.private_ip}/32"
-  vpc_id              = "${aws_vpc.vpc.id}"
-  certificate_pem     = "${module.issue_certificate.certificate_pem[0]}"
-  certificate_key_pem = "${module.issue_certificate.certificate_key_pem[0]}"
-  issuer_pem          = "${module.issue_certificate.issuer_pem[0]}"
-}
-
-module "register_web_server_dns" {
-  source = "../modules/register-dns-record"
-
-  domain_name    = "${var.domain_name}"
-  dns_name_or_ip = "${module.web_server.public_dns_name}"
-}
-
-module "bastion_server" {
-  source = "../modules/bastion-server"
-
-  ami_id                = "${data.aws_ami.latest_ubuntu_ami.id}"
-  subnet_id             = "${aws_subnet.public_sn.id}"
-  aws_key_name          = "${aws_key_pair.public_key_pair.key_name}"
-  vpc_id                = "${aws_vpc.vpc.id}"
-  vpc_cidr_block        = "${aws_vpc.vpc.cidr_block}"
-  private_key_pem       = "${file("../keys/${var.ssh_key_file_name}")}"
-  private_key_file_name = "${var.ssh_key_file_name}"
-}
-
-module "backend_server" {
-  source = "../modules/backend-server"
-
-  ami_id              = "${data.aws_ami.latest_ubuntu_ami.id}"
-  subnet_id           = "${aws_subnet.private_sn.id}"
-  aws_key_name        = "${aws_key_pair.public_key_pair.key_name}"
-  bastion_server_cidr = "${module.bastion_server.private_ip}/32"
-  vpc_id              = "${aws_vpc.vpc.id}"
 }
